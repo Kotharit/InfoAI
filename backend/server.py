@@ -135,8 +135,9 @@ IMPORTANT: Return EXACTLY the JSON object and nothing else. No markdown code blo
         raise HTTPException(status_code=500, detail=f"Gemini API error: {str(e)}")
 
 def parse_json_response(text: str) -> dict:
-    """Parse JSON from the model response, handling markdown code blocks."""
+    """Parse JSON from the model response, handling markdown code blocks and extracting valid JSON."""
     import json
+    import re
     
     # Clean up the response - remove markdown code blocks if present
     cleaned = text.strip()
@@ -148,11 +149,66 @@ def parse_json_response(text: str) -> dict:
         cleaned = cleaned[:-3]
     cleaned = cleaned.strip()
     
+    # First try direct parsing
     try:
         return json.loads(cleaned)
-    except json.JSONDecodeError as e:
-        logger.error(f"JSON parse error: {e}, text: {cleaned[:200]}")
-        raise ValueError(f"Invalid JSON: {str(e)}")
+    except json.JSONDecodeError:
+        pass
+    
+    # Try to extract JSON object using regex - find the outermost { }
+    try:
+        # Find the first { and last } to extract the JSON object
+        start = cleaned.find('{')
+        end = cleaned.rfind('}')
+        if start != -1 and end != -1 and end > start:
+            json_str = cleaned[start:end+1]
+            # Try to parse
+            try:
+                return json.loads(json_str)
+            except json.JSONDecodeError:
+                pass
+            
+            # Try to fix common issues - remove any text that appears in the middle
+            # by reconstructing from matched braces
+            depth = 0
+            result = []
+            in_string = False
+            escape = False
+            
+            for i, char in enumerate(json_str):
+                if escape:
+                    escape = False
+                    result.append(char)
+                    continue
+                if char == '\\':
+                    escape = True
+                    result.append(char)
+                    continue
+                if char == '"' and not escape:
+                    in_string = not in_string
+                
+                if not in_string:
+                    if char == '{':
+                        depth += 1
+                    elif char == '}':
+                        depth -= 1
+                
+                result.append(char)
+                
+                # If we're back to depth 0, we found the complete JSON
+                if depth == 0 and char == '}':
+                    break
+            
+            final_json = ''.join(result)
+            try:
+                return json.loads(final_json)
+            except json.JSONDecodeError as e:
+                logger.error(f"JSON parse error after extraction: {e}, text: {final_json[:200]}")
+                raise ValueError(f"Invalid JSON: {str(e)}")
+    
+    except Exception as e:
+        logger.error(f"JSON extraction error: {e}, original text: {cleaned[:200]}")
+        raise ValueError(f"Could not extract valid JSON: {str(e)}")
 
 # Routes
 @api_router.get("/")
