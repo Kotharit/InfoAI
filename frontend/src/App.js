@@ -67,14 +67,43 @@ const ThemeToggle = () => {
   );
 };
 
-// Icon Map for Infographic Blocks
+// Icon Map for Infographic Blocks - Comprehensive mapping
 const ICON_MAP = {
+  // Industry & Environment
   factory: "🏭", thermometer: "🌡️", leaf: "🌱", sun: "☀️", chart: "📊", clock: "⏱️",
   "polar-bear": "🐻‍❄️", car: "🚗", user: "👤", lightbulb: "💡", phone: "📱", document: "📄",
   rocket: "🚀", star: "⭐", heart: "❤️", globe: "🌍", money: "💰", book: "📚",
   target: "🎯", tools: "🔧", shield: "🛡️", brain: "🧠", idea: "💡", growth: "📈",
   team: "👥", computer: "💻", email: "📧", calendar: "📅", check: "✅", warning: "⚠️",
-  innovation: "🔬", strategy: "♟️", success: "🏆", data: "📊", network: "🌐", security: "🔒"
+  innovation: "🔬", strategy: "♟️", success: "🏆", data: "📊", network: "🌐", security: "🔒",
+  
+  // Healthcare & Medical
+  scan: "🔬", flask: "🧪", patient: "👨‍⚕️", doctor: "👩‍⚕️", medicine: "💊", pill: "💊",
+  hospital: "🏥", ambulance: "🚑", health: "❤️‍🩹", dna: "🧬", virus: "🦠", microscope: "🔬",
+  stethoscope: "🩺", syringe: "💉", bandage: "🩹", wheelchair: "♿", treatment: "💉",
+  diagnosis: "🔍", research: "🔬", lab: "🧪", analytics: "📈", prediction: "🔮",
+  
+  // Technology & AI
+  ai: "🤖", robot: "🤖", automation: "⚙️", machine: "🖥️", algorithm: "🧮", code: "💻",
+  chip: "🔌", database: "🗄️", cloud: "☁️", server: "🖥️", digital: "📱", tech: "💻",
+  
+  // Business & Finance
+  business: "💼", finance: "💵", investment: "📈", profit: "💰", sales: "📊", 
+  marketing: "📢", customer: "👥", partnership: "🤝", contract: "📝", office: "🏢",
+  
+  // Education & Learning
+  education: "🎓", learn: "📖", study: "📚", school: "🏫", knowledge: "🧠", training: "🏋️",
+  
+  // Communication
+  communication: "💬", message: "✉️", social: "🌐", media: "📺", broadcast: "📡",
+  
+  // Nature & Sustainability
+  nature: "🌿", tree: "🌳", water: "💧", ocean: "🌊", mountain: "⛰️", animal: "🐾",
+  recycle: "♻️", green: "🌿", solar: "☀️", wind: "💨", energy: "⚡", eco: "🌱",
+  
+  // General Purpose
+  key: "🔑", lock: "🔐", search: "🔍", settings: "⚙️", home: "🏠", location: "📍",
+  time: "⏰", speed: "⚡", quality: "✨", premium: "👑", award: "🏅", gift: "🎁"
 };
 
 const getIconEmoji = (key) => {
