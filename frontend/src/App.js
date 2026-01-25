@@ -2,7 +2,6 @@ import { useState, useRef, useEffect, createContext, useContext } from "react";
 import "@/App.css";
 import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
 import axios from "axios";
-import * as htmlToImage from "html-to-image";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -67,96 +66,6 @@ const ThemeToggle = () => {
   );
 };
 
-// Icon Map for Infographic Blocks - Comprehensive mapping
-const ICON_MAP = {
-  // Industry & Environment
-  factory: "🏭", thermometer: "🌡️", leaf: "🌱", sun: "☀️", chart: "📊", clock: "⏱️",
-  "polar-bear": "🐻‍❄️", car: "🚗", user: "👤", lightbulb: "💡", phone: "📱", document: "📄",
-  rocket: "🚀", star: "⭐", heart: "❤️", globe: "🌍", money: "💰", book: "📚",
-  target: "🎯", tools: "🔧", shield: "🛡️", brain: "🧠", idea: "💡", growth: "📈",
-  team: "👥", computer: "💻", email: "📧", calendar: "📅", check: "✅", warning: "⚠️",
-  innovation: "🔬", strategy: "♟️", success: "🏆", data: "📊", network: "🌐", security: "🔒",
-  
-  // Healthcare & Medical
-  scan: "🔬", flask: "🧪", patient: "👨‍⚕️", doctor: "👩‍⚕️", medicine: "💊", pill: "💊",
-  hospital: "🏥", ambulance: "🚑", health: "❤️‍🩹", dna: "🧬", virus: "🦠", microscope: "🔬",
-  stethoscope: "🩺", syringe: "💉", bandage: "🩹", wheelchair: "♿", treatment: "💉",
-  diagnosis: "🔍", diagnose: "🔍", research: "🔬", lab: "🧪", analytics: "📈", prediction: "🔮",
-  medical: "⚕️", personalize: "👤", personalized: "👤", admin: "📋", administrative: "📋",
-  automate: "⚙️", automation: "⚙️", automated: "⚙️", predict: "🔮", predictive: "🔮",
-  
-  // Technology & AI
-  ai: "🤖", robot: "🤖", machine: "🖥️", algorithm: "🧮", code: "💻",
-  chip: "🔌", database: "🗄️", cloud: "☁️", server: "🖥️", digital: "📱", tech: "💻",
-  
-  // Business & Finance
-  business: "💼", finance: "💵", investment: "📈", profit: "💰", sales: "📊", 
-  marketing: "📢", customer: "👥", partnership: "🤝", contract: "📝", office: "🏢",
-  
-  // Education & Learning
-  education: "🎓", learn: "📖", study: "📚", school: "🏫", knowledge: "🧠", training: "🏋️",
-  
-  // Communication
-  communication: "💬", message: "✉️", social: "🌐", media: "📺", broadcast: "📡",
-  
-  // Nature & Sustainability
-  nature: "🌿", tree: "🌳", water: "💧", ocean: "🌊", mountain: "⛰️", animal: "🐾",
-  recycle: "♻️", green: "🌿", solar: "☀️", wind: "💨", energy: "⚡", eco: "🌱",
-  
-  // General Purpose
-  key: "🔑", lock: "🔐", search: "🔍", settings: "⚙️", home: "🏠", location: "📍",
-  time: "⏰", speed: "⚡", quality: "✨", premium: "👑", award: "🏅", gift: "🎁",
-  task: "📋", tasks: "📋", process: "⚙️", step: "👣", steps: "👣", workflow: "🔄"
-};
-
-// Smart icon lookup with fallbacks
-const getIconEmoji = (key) => {
-  if (!key) return "📌";
-  const lowerKey = key.toLowerCase().trim();
-  
-  // Direct match
-  if (ICON_MAP[lowerKey]) return ICON_MAP[lowerKey];
-  
-  // Try removing common suffixes
-  const baseName = lowerKey.replace(/s$/, '').replace(/ing$/, '').replace(/ed$/, '').replace(/tion$/, '');
-  if (ICON_MAP[baseName]) return ICON_MAP[baseName];
-  
-  // Try first word if hyphenated or underscored
-  const firstPart = lowerKey.split(/[-_ ]/)[0];
-  if (ICON_MAP[firstPart]) return ICON_MAP[firstPart];
-  
-  // Try to find partial match
-  const keys = Object.keys(ICON_MAP);
-  for (const iconKey of keys) {
-    if (lowerKey.includes(iconKey) || iconKey.includes(lowerKey)) {
-      return ICON_MAP[iconKey];
-    }
-  }
-  
-  // Default fallback based on common categories
-  if (lowerKey.includes('health') || lowerKey.includes('medic') || lowerKey.includes('care')) return "⚕️";
-  if (lowerKey.includes('tech') || lowerKey.includes('digital') || lowerKey.includes('ai')) return "🤖";
-  if (lowerKey.includes('business') || lowerKey.includes('work')) return "💼";
-  if (lowerKey.includes('learn') || lowerKey.includes('edu')) return "📚";
-  
-  return "📌";
-};
-
-const getPaletteColors = (palette, isDark) => {
-  const palettes = {
-    teal: isDark 
-      ? ["#134e4a", "#115e59", "#0f766e", "#14b8a6"]
-      : ["#ccfbf1", "#99f6e4", "#5eead4", "#2dd4bf"],
-    warm: isDark 
-      ? ["#7c2d12", "#9a3412", "#c2410c", "#ea580c"]
-      : ["#fff7ed", "#ffedd5", "#fed7aa", "#fdba74"],
-    mono: isDark 
-      ? ["#27272a", "#3f3f46", "#52525b", "#71717a"]
-      : ["#f4f4f5", "#e4e4e7", "#d4d4d8", "#a1a1aa"]
-  };
-  return palettes[palette] || palettes.teal;
-};
-
 // Landing Page
 const LandingPage = () => {
   const navigate = useNavigate();
@@ -180,13 +89,13 @@ const LandingPage = () => {
 
           {/* Headline */}
           <h1 className={`text-5xl md:text-6xl font-bold mb-6 leading-tight ${isDark ? "text-white" : "text-gray-900"}`}>
-            Transform Content into
-            <span className={`block ${isDark ? "text-teal-400" : "text-teal-600"}`}>Beautiful Infographics</span>
+            Transform Reports into
+            <span className={`block ${isDark ? "text-teal-400" : "text-teal-600"}`}>Stunning Visual Stories</span>
           </h1>
 
           {/* Subtitle */}
           <p className={`text-xl md:text-2xl mb-10 max-w-2xl mx-auto ${isDark ? "text-gray-300" : "text-gray-600"}`}>
-            Upload a PDF or paste text, and let AI create stunning visual summaries in seconds. No design skills needed.
+            Upload a PDF report and let AI create beautiful, storytelling-oriented infographics with visual metaphors and executive clarity.
           </p>
 
           {/* CTA Button */}
@@ -198,7 +107,7 @@ const LandingPage = () => {
                 : "bg-gradient-to-r from-teal-500 to-cyan-500 text-white hover:from-teal-600 hover:to-cyan-600"
             }`}
           >
-            Get Started
+            Create Infographic
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="group-hover:translate-x-1 transition-transform">
               <line x1="5" y1="12" x2="19" y2="12"/>
               <polyline points="12 5 19 12 12 19"/>
@@ -216,11 +125,10 @@ const LandingPage = () => {
                   <polyline points="14 2 14 8 20 8"/>
                   <line x1="16" y1="13" x2="8" y2="13"/>
                   <line x1="16" y1="17" x2="8" y2="17"/>
-                  <polyline points="10 9 9 9 8 9"/>
                 </svg>
               ),
-              title: "PDF & Text Input",
-              description: "Upload PDF documents or paste text directly. Our AI extracts and processes your content automatically."
+              title: "AI-Powered Analysis",
+              description: "Gemini AI reads your report, identifies key findings, and creates a structured visual blueprint with storytelling elements."
             },
             {
               icon: (
@@ -230,8 +138,8 @@ const LandingPage = () => {
                   <polyline points="2 12 12 17 22 12"/>
                 </svg>
               ),
-              title: "AI-Powered Design",
-              description: "Google Gemini analyzes your content and creates structured infographic layouts with perfect information hierarchy."
+              title: "Visual Metaphors",
+              description: "Transform boring data into compelling visual narratives with before/after comparisons, creative metaphors, and executive-grade design."
             },
             {
               icon: (
@@ -241,8 +149,8 @@ const LandingPage = () => {
                   <line x1="12" y1="15" x2="12" y2="3"/>
                 </svg>
               ),
-              title: "Export as PNG",
-              description: "Download your infographic as a high-quality PNG image, ready to share or include in presentations."
+              title: "High-Quality Export",
+              description: "Download stunning PNG infographics ready for presentations, reports, and executive communications."
             }
           ].map((feature, idx) => (
             <div
@@ -268,33 +176,27 @@ const LandingPage = () => {
           ))}
         </div>
 
-        {/* How it Works */}
+        {/* Pipeline Explanation */}
         <div className="mt-24 max-w-4xl mx-auto">
           <h2 className={`text-3xl font-bold text-center mb-12 ${isDark ? "text-white" : "text-gray-900"}`}>
             How It Works
           </h2>
-          <div className="flex flex-col md:flex-row items-center justify-between gap-8">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             {[
-              { step: "1", title: "Upload", desc: "Add your PDF or paste text" },
-              { step: "2", title: "Generate", desc: "AI creates your infographic" },
-              { step: "3", title: "Export", desc: "Download as PNG" }
+              { step: "1", title: "Upload Report", desc: "PDF or paste text", icon: "📄" },
+              { step: "2", title: "AI Blueprint", desc: "Gemini creates structure", icon: "🧠" },
+              { step: "3", title: "Prompt Compile", desc: "Deterministic conversion", icon: "⚙️" },
+              { step: "4", title: "Image Gen", desc: "Nano Banana Pro renders", icon: "🎨" }
             ].map((item, idx) => (
-              <div key={idx} className="flex items-center gap-4">
-                <div className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center font-bold text-xl ${
+              <div key={idx} className="flex flex-col items-center text-center">
+                <div className={`text-4xl mb-3`}>{item.icon}</div>
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg mb-2 ${
                   isDark ? "bg-teal-600 text-white" : "bg-teal-500 text-white"
                 }`}>
                   {item.step}
                 </div>
-                <div>
-                  <h4 className={`font-semibold ${isDark ? "text-white" : "text-gray-900"}`}>{item.title}</h4>
-                  <p className={`text-sm ${isDark ? "text-gray-400" : "text-gray-600"}`}>{item.desc}</p>
-                </div>
-                {idx < 2 && (
-                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={isDark ? "#6b7280" : "#9ca3af"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="hidden md:block ml-4">
-                    <line x1="5" y1="12" x2="19" y2="12"/>
-                    <polyline points="12 5 19 12 12 19"/>
-                  </svg>
-                )}
+                <h4 className={`font-semibold ${isDark ? "text-white" : "text-gray-900"}`}>{item.title}</h4>
+                <p className={`text-sm ${isDark ? "text-gray-400" : "text-gray-600"}`}>{item.desc}</p>
               </div>
             ))}
           </div>
@@ -304,9 +206,53 @@ const LandingPage = () => {
       {/* Footer */}
       <footer className={`py-8 mt-16 border-t ${isDark ? "border-gray-800" : "border-gray-200"}`}>
         <p className={`text-center text-sm ${isDark ? "text-gray-500" : "text-gray-500"}`}>
-          Infographic MVP — Powered by Google Gemini AI
+          Infographic MVP v2.0 — Gemini Blueprint → Prompt Compiler → Nano Banana Pro Pipeline
         </p>
       </footer>
+    </div>
+  );
+};
+
+// Loading Steps Component
+const LoadingSteps = ({ currentStep }) => {
+  const steps = [
+    { id: 1, label: "Extracting text from document...", icon: "📄" },
+    { id: 2, label: "Gemini creating visual blueprint...", icon: "🧠" },
+    { id: 3, label: "Compiling image prompt...", icon: "⚙️" },
+    { id: 4, label: "Nano Banana Pro generating image...", icon: "🎨" }
+  ];
+
+  return (
+    <div className="space-y-4">
+      {steps.map((step) => (
+        <div key={step.id} className={`flex items-center gap-4 p-4 rounded-lg transition-all ${
+          currentStep === step.id 
+            ? "bg-teal-50 dark:bg-teal-900/30 border-2 border-teal-500" 
+            : currentStep > step.id 
+            ? "bg-green-50 dark:bg-green-900/20 border border-green-300 dark:border-green-700"
+            : "bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 opacity-50"
+        }`}>
+          <span className="text-2xl">{step.icon}</span>
+          <span className={`font-medium ${
+            currentStep === step.id ? "text-teal-700 dark:text-teal-300" : 
+            currentStep > step.id ? "text-green-700 dark:text-green-300" : 
+            "text-gray-500"
+          }`}>
+            {step.label}
+          </span>
+          {currentStep === step.id && (
+            <svg className="animate-spin h-5 w-5 text-teal-500 ml-auto" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+            </svg>
+          )}
+          {currentStep > step.id && (
+            <svg className="h-5 w-5 text-green-500 ml-auto" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M20 6L9 17l-5-5"/>
+            </svg>
+          )}
+        </div>
+      ))}
     </div>
   );
 };
@@ -315,27 +261,16 @@ const LandingPage = () => {
 const MainApp = () => {
   const navigate = useNavigate();
   const { isDark } = useTheme();
-  const infographicRef = useRef(null);
   
   const [prompt, setPrompt] = useState("");
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [loadingStep, setLoadingStep] = useState(0);
   const [status, setStatus] = useState({ message: "", type: "" });
-  const [layout, setLayout] = useState("vertical_steps");
-  const [palette, setPalette] = useState("teal");
-  const [rawOutput, setRawOutput] = useState("");
-  
-  const [infographic, setInfographic] = useState({
-    title: "Understanding Climate Change",
-    subtitle: "Causes, impacts, and action in one page",
-    layout: "vertical_steps",
-    style: { palette: "teal" },
-    blocks: [
-      { id: 1, icon: "factory", heading: "Main Causes", bullets: ["Greenhouse gas emissions", "Deforestation & pollution"] },
-      { id: 2, icon: "thermometer", heading: "Key Impacts", bullets: ["Rising temperatures", "Extreme weather events"] },
-      { id: 3, icon: "leaf", heading: "How to Act", bullets: ["Reduce carbon footprint", "Use renewable energy"] }
-    ]
-  });
+  const [generatedImage, setGeneratedImage] = useState(null);
+  const [blueprint, setBlueprint] = useState(null);
+  const [compiledPromptPreview, setCompiledPromptPreview] = useState("");
+  const [showDebug, setShowDebug] = useState(false);
 
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
@@ -354,27 +289,47 @@ const MainApp = () => {
     }
 
     setLoading(true);
-    setStatus({ message: "Generating infographic...", type: "info" });
-    setRawOutput("");
+    setLoadingStep(1);
+    setStatus({ message: "", type: "" });
+    setGeneratedImage(null);
+    setBlueprint(null);
+    setCompiledPromptPreview("");
 
     const formData = new FormData();
     if (file) formData.append("file", file);
     formData.append("prompt", prompt);
 
     try {
+      // Simulate step progression
+      setLoadingStep(1);
+      await new Promise(r => setTimeout(r, 500));
+      
+      setLoadingStep(2);
+      
       const response = await axios.post(`${API}/generate`, formData, {
-        headers: { "Content-Type": "multipart/form-data" }
+        headers: { "Content-Type": "multipart/form-data" },
+        timeout: 120000 // 2 minute timeout for image generation
       });
 
-      if (response.data.ok && response.data.infographic) {
-        const data = response.data.infographic;
-        setInfographic(data);
-        if (data.layout) setLayout(data.layout);
-        if (data.style?.palette) setPalette(data.style.palette);
+      setLoadingStep(3);
+      await new Promise(r => setTimeout(r, 300));
+      setLoadingStep(4);
+      await new Promise(r => setTimeout(r, 300));
+
+      if (response.data.ok) {
+        const { image, blueprint: bp, compiled_prompt_preview } = response.data;
+        
+        if (image && image.data) {
+          // Set the image with proper data URL format
+          const imageDataUrl = `data:${image.mime_type || 'image/png'};base64,${image.data}`;
+          setGeneratedImage(imageDataUrl);
+        }
+        
+        setBlueprint(bp);
+        setCompiledPromptPreview(compiled_prompt_preview || "");
         setStatus({ message: "Infographic generated successfully!", type: "success" });
       } else {
         setStatus({ message: response.data.error || "Generation failed", type: "error" });
-        if (response.data.raw) setRawOutput(response.data.raw);
       }
     } catch (error) {
       console.error("Generate error:", error);
@@ -383,9 +338,9 @@ const MainApp = () => {
         message: errorData?.error || error.message || "An error occurred", 
         type: "error" 
       });
-      if (errorData?.raw) setRawOutput(errorData.raw);
     } finally {
       setLoading(false);
+      setLoadingStep(0);
     }
   };
 
@@ -393,44 +348,21 @@ const MainApp = () => {
     setPrompt("");
     setFile(null);
     setStatus({ message: "", type: "" });
-    setRawOutput("");
-    // Reset file input
+    setGeneratedImage(null);
+    setBlueprint(null);
+    setCompiledPromptPreview("");
     const fileInput = document.getElementById("file-input");
     if (fileInput) fileInput.value = "";
   };
 
-  const handleExport = async () => {
-    if (!infographicRef.current) return;
+  const handleDownload = () => {
+    if (!generatedImage) return;
     
-    try {
-      setStatus({ message: "Exporting PNG...", type: "info" });
-      const dataUrl = await htmlToImage.toPng(infographicRef.current, {
-        backgroundColor: isDark ? "#1f2937" : "#ffffff",
-        quality: 1,
-        pixelRatio: 2
-      });
-      
-      const link = document.createElement("a");
-      link.download = "infographic.png";
-      link.href = dataUrl;
-      link.click();
-      setStatus({ message: "PNG exported successfully!", type: "success" });
-    } catch (error) {
-      console.error("Export error:", error);
-      setStatus({ message: "Export failed: " + error.message, type: "error" });
-    }
+    const link = document.createElement("a");
+    link.download = "infographic.png";
+    link.href = generatedImage;
+    link.click();
   };
-
-  // Update infographic when layout/palette changes
-  useEffect(() => {
-    setInfographic(prev => ({
-      ...prev,
-      layout,
-      style: { palette }
-    }));
-  }, [layout, palette]);
-
-  const paletteColors = getPaletteColors(palette, isDark);
 
   return (
     <div className={`min-h-screen transition-colors duration-300 ${isDark ? "bg-gray-900" : "bg-gray-50"}`}>
@@ -450,27 +382,35 @@ const MainApp = () => {
             </div>
             <span className={`font-bold text-xl ${isDark ? "text-white" : "text-gray-900"}`}>Infographic MVP</span>
           </button>
-          <p className={`text-sm ${isDark ? "text-gray-400" : "text-gray-500"}`}>
-            Upload → Generate → Export
-          </p>
+          <div className="flex items-center gap-4">
+            <span className={`text-sm ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+              v2.0 — Gemini → Nano Banana Pro
+            </span>
+            <button
+              onClick={() => setShowDebug(!showDebug)}
+              className={`text-xs px-2 py-1 rounded ${isDark ? "bg-gray-700 text-gray-300" : "bg-gray-200 text-gray-600"}`}
+            >
+              {showDebug ? "Hide Debug" : "Debug"}
+            </button>
+          </div>
         </div>
       </header>
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-6 py-8">
-        <div className="grid lg:grid-cols-3 gap-8">
+        <div className="grid lg:grid-cols-2 gap-8">
           {/* Input Panel */}
-          <div className={`lg:col-span-1 space-y-6`}>
+          <div className="space-y-6">
             {/* Text Input */}
             <div className={`p-6 rounded-xl ${isDark ? "bg-gray-800 border border-gray-700" : "bg-white shadow-lg border border-gray-100"}`}>
               <label className={`block font-semibold mb-3 ${isDark ? "text-white" : "text-gray-900"}`}>
-                Paste Text or Prompt
+                📄 Paste Report Text or Prompt
               </label>
               <textarea
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 rows={8}
-                placeholder="Paste article, document summary, or describe what you want..."
+                placeholder="Paste your report content, site visit notes, or describe what infographic you want..."
                 className={`w-full p-4 rounded-lg border resize-none transition-colors ${
                   isDark 
                     ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-teal-500" 
@@ -481,7 +421,7 @@ const MainApp = () => {
               {/* File Upload */}
               <div className="mt-4">
                 <label className={`block font-semibold mb-2 ${isDark ? "text-white" : "text-gray-900"}`}>
-                  Or Upload PDF
+                  📁 Or Upload PDF Report
                 </label>
                 <input
                   id="file-input"
@@ -507,15 +447,7 @@ const MainApp = () => {
                       : "hover:scale-[1.02]"
                   } ${isDark ? "bg-teal-600 text-white hover:bg-teal-500" : "bg-teal-500 text-white hover:bg-teal-600"}`}
                 >
-                  {loading ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
-                      </svg>
-                      Generating...
-                    </span>
-                  ) : "Generate"}
+                  {loading ? "Generating..." : "🎨 Generate Infographic"}
                 </button>
                 <button
                   onClick={handleClear}
@@ -541,170 +473,113 @@ const MainApp = () => {
                   {status.message}
                 </div>
               )}
-
-              <p className={`mt-4 text-xs ${isDark ? "text-gray-500" : "text-gray-400"}`}>
-                Tip: Keep input under 15,000 characters for best results.
-              </p>
             </div>
 
-            {/* Preview Controls */}
-            <div className={`p-6 rounded-xl ${isDark ? "bg-gray-800 border border-gray-700" : "bg-white shadow-lg border border-gray-100"}`}>
-              <h3 className={`font-semibold mb-4 ${isDark ? "text-white" : "text-gray-900"}`}>
-                Preview Controls
-              </h3>
-              
-              <button
-                onClick={handleExport}
-                className={`w-full py-3 px-4 rounded-lg font-semibold transition-all hover:scale-[1.02] ${
-                  isDark ? "bg-teal-600 text-white hover:bg-teal-500" : "bg-teal-500 text-white hover:bg-teal-600"
-                }`}
-              >
-                <span className="flex items-center justify-center gap-2">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                    <polyline points="7 10 12 15 17 10"/>
-                    <line x1="12" y1="15" x2="12" y2="3"/>
-                  </svg>
-                  Export PNG
-                </span>
-              </button>
-
-              {/* Layout Selector */}
-              <div className="mt-5">
-                <label className={`block font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                  Layout
-                </label>
-                <select
-                  value={layout}
-                  onChange={(e) => setLayout(e.target.value)}
-                  className={`w-full p-3 rounded-lg border transition-colors ${
-                    isDark 
-                      ? "bg-gray-700 border-gray-600 text-white" 
-                      : "bg-gray-50 border-gray-200 text-gray-900"
-                  } focus:outline-none focus:ring-2 focus:ring-teal-500/20`}
-                >
-                  <option value="vertical_steps">Vertical Steps</option>
-                  <option value="timeline">Timeline</option>
-                  <option value="grid">Grid</option>
-                </select>
+            {/* Loading Steps */}
+            {loading && (
+              <div className={`p-6 rounded-xl ${isDark ? "bg-gray-800 border border-gray-700" : "bg-white shadow-lg border border-gray-100"}`}>
+                <h3 className={`font-semibold mb-4 ${isDark ? "text-white" : "text-gray-900"}`}>
+                  🔄 Generation Pipeline
+                </h3>
+                <LoadingSteps currentStep={loadingStep} />
               </div>
+            )}
 
-              {/* Palette Selector */}
-              <div className="mt-4">
-                <label className={`block font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                  Palette
-                </label>
-                <select
-                  value={palette}
-                  onChange={(e) => setPalette(e.target.value)}
-                  className={`w-full p-3 rounded-lg border transition-colors ${
-                    isDark 
-                      ? "bg-gray-700 border-gray-600 text-white" 
-                      : "bg-gray-50 border-gray-200 text-gray-900"
-                  } focus:outline-none focus:ring-2 focus:ring-teal-500/20`}
-                >
-                  <option value="teal">Teal</option>
-                  <option value="warm">Warm</option>
-                  <option value="mono">Mono</option>
-                </select>
-              </div>
-
-              {/* Raw Output Debug */}
-              {rawOutput && (
-                <details className="mt-4">
-                  <summary className={`cursor-pointer text-sm ${isDark ? "text-gray-400" : "text-gray-500"}`}>
-                    Show raw model output (debug)
+            {/* Debug Panel */}
+            {showDebug && blueprint && (
+              <div className={`p-6 rounded-xl ${isDark ? "bg-gray-800 border border-gray-700" : "bg-white shadow-lg border border-gray-100"}`}>
+                <h3 className={`font-semibold mb-4 ${isDark ? "text-white" : "text-gray-900"}`}>
+                  🔧 Debug Info
+                </h3>
+                
+                <details className="mb-4">
+                  <summary className={`cursor-pointer font-medium ${isDark ? "text-teal-400" : "text-teal-600"}`}>
+                    Visual Blueprint JSON
                   </summary>
-                  <pre className={`mt-2 p-3 rounded-lg text-xs overflow-auto max-h-48 ${
+                  <pre className={`mt-2 p-3 rounded-lg text-xs overflow-auto max-h-64 ${
                     isDark ? "bg-gray-700 text-gray-300" : "bg-gray-100 text-gray-700"
                   }`}>
-                    {rawOutput}
+                    {JSON.stringify(blueprint, null, 2)}
                   </pre>
                 </details>
-              )}
-            </div>
+                
+                {compiledPromptPreview && (
+                  <details>
+                    <summary className={`cursor-pointer font-medium ${isDark ? "text-teal-400" : "text-teal-600"}`}>
+                      Compiled Prompt Preview
+                    </summary>
+                    <pre className={`mt-2 p-3 rounded-lg text-xs overflow-auto max-h-64 whitespace-pre-wrap ${
+                      isDark ? "bg-gray-700 text-gray-300" : "bg-gray-100 text-gray-700"
+                    }`}>
+                      {compiledPromptPreview}
+                    </pre>
+                  </details>
+                )}
+              </div>
+            )}
           </div>
 
-          {/* Infographic Preview */}
-          <div className="lg:col-span-2">
-            <div
-              ref={infographicRef}
-              className={`rounded-2xl overflow-hidden shadow-xl ${isDark ? "bg-gray-800" : "bg-white"}`}
-            >
-              {/* Header */}
-              <div className={`p-8 text-center border-b ${isDark ? "border-gray-700" : "border-gray-100"}`}>
-                <h1 className={`text-3xl font-bold ${isDark ? "text-white" : "text-gray-900"}`}>
-                  {infographic.title}
-                </h1>
-                <p className={`mt-2 ${isDark ? "text-gray-400" : "text-gray-500"}`}>
-                  {infographic.subtitle}
-                </p>
-              </div>
-
-              {/* Blocks */}
-              <div className={`p-8 ${
-                layout === "grid" 
-                  ? "grid grid-cols-1 md:grid-cols-2 gap-6" 
-                  : "flex flex-col gap-5"
-              }`}>
-                {infographic.blocks.map((block, idx) => (
-                  <div
-                    key={block.id}
-                    className={`flex gap-5 p-5 rounded-xl transition-all ${
-                      layout === "timeline" ? "relative pl-16" : ""
-                    } ${isDark ? "bg-gray-700/50" : "bg-gray-50"}`}
+          {/* Output Panel */}
+          <div className="space-y-6">
+            <div className={`p-6 rounded-xl ${isDark ? "bg-gray-800 border border-gray-700" : "bg-white shadow-lg border border-gray-100"}`}>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className={`font-semibold ${isDark ? "text-white" : "text-gray-900"}`}>
+                  🖼️ Generated Infographic
+                </h3>
+                {generatedImage && (
+                  <button
+                    onClick={handleDownload}
+                    className={`flex items-center gap-2 py-2 px-4 rounded-lg font-medium transition-all hover:scale-105 ${
+                      isDark ? "bg-teal-600 text-white hover:bg-teal-500" : "bg-teal-500 text-white hover:bg-teal-600"
+                    }`}
                   >
-                    {/* Timeline connector */}
-                    {layout === "timeline" && (
-                      <>
-                        <div className={`absolute left-6 top-0 bottom-0 w-0.5 ${
-                          isDark ? "bg-gray-600" : "bg-gray-200"
-                        } ${idx === 0 ? "top-1/2" : ""} ${idx === infographic.blocks.length - 1 ? "bottom-1/2" : ""}`} />
-                        <div 
-                          className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full border-2 flex items-center justify-center"
-                          style={{ 
-                            borderColor: paletteColors[idx % paletteColors.length],
-                            backgroundColor: isDark ? "#374151" : "#ffffff"
-                          }}
-                        >
-                          <div 
-                            className="w-2 h-2 rounded-full"
-                            style={{ backgroundColor: paletteColors[idx % paletteColors.length] }}
-                          />
-                        </div>
-                      </>
-                    )}
-
-                    {/* Icon */}
-                    <div
-                      className="flex-shrink-0 w-16 h-16 rounded-xl flex items-center justify-center text-3xl shadow-md"
-                      style={{ backgroundColor: paletteColors[idx % paletteColors.length] }}
-                    >
-                      {getIconEmoji(block.icon)}
-                    </div>
-
-                    {/* Content */}
-                    <div className="flex-1">
-                      <h3 className={`font-bold text-lg mb-2 ${isDark ? "text-white" : "text-gray-900"}`}>
-                        {block.heading}
-                      </h3>
-                      <ul className={`space-y-1 ${isDark ? "text-gray-300" : "text-gray-600"}`}>
-                        {block.bullets.map((bullet, bIdx) => (
-                          <li key={bIdx} className="flex items-start gap-2">
-                            <span className={isDark ? "text-teal-400" : "text-teal-500"}>•</span>
-                            {bullet}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
-                ))}
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                      <polyline points="7 10 12 15 17 10"/>
+                      <line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                    Download PNG
+                  </button>
+                )}
               </div>
-            </div>
+              
+              {/* Image Display */}
+              <div className={`rounded-lg overflow-hidden border ${isDark ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-gray-50"}`}>
+                {generatedImage ? (
+                  <img 
+                    src={generatedImage} 
+                    alt="Generated Infographic"
+                    className="w-full h-auto"
+                    style={{ maxHeight: "80vh" }}
+                  />
+                ) : (
+                  <div className={`flex flex-col items-center justify-center py-24 ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="mb-4 opacity-50">
+                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                      <circle cx="8.5" cy="8.5" r="1.5"/>
+                      <polyline points="21 15 16 10 5 21"/>
+                    </svg>
+                    <p className="text-lg font-medium">No image generated yet</p>
+                    <p className="text-sm mt-2">Upload a report and click Generate</p>
+                  </div>
+                )}
+              </div>
 
-            <p className={`mt-4 text-center text-sm ${isDark ? "text-gray-500" : "text-gray-400"}`}>
-              Preview your infographic above. Use Export to save as PNG.
-            </p>
+              {/* Blueprint Summary */}
+              {blueprint && (
+                <div className={`mt-4 p-4 rounded-lg ${isDark ? "bg-gray-700/50" : "bg-gray-50"}`}>
+                  <h4 className={`font-semibold mb-2 ${isDark ? "text-white" : "text-gray-900"}`}>
+                    {blueprint.title}
+                  </h4>
+                  <p className={`text-sm ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+                    {blueprint.subtitle}
+                  </p>
+                  <p className={`text-xs mt-2 ${isDark ? "text-gray-500" : "text-gray-500"}`}>
+                    Layout: {blueprint.layout} | Creativity: {blueprint.creativity} | Palette: {blueprint.palette}
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </main>
