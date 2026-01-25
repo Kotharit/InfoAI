@@ -81,10 +81,12 @@ const ICON_MAP = {
   scan: "🔬", flask: "🧪", patient: "👨‍⚕️", doctor: "👩‍⚕️", medicine: "💊", pill: "💊",
   hospital: "🏥", ambulance: "🚑", health: "❤️‍🩹", dna: "🧬", virus: "🦠", microscope: "🔬",
   stethoscope: "🩺", syringe: "💉", bandage: "🩹", wheelchair: "♿", treatment: "💉",
-  diagnosis: "🔍", research: "🔬", lab: "🧪", analytics: "📈", prediction: "🔮",
+  diagnosis: "🔍", diagnose: "🔍", research: "🔬", lab: "🧪", analytics: "📈", prediction: "🔮",
+  medical: "⚕️", personalize: "👤", personalized: "👤", admin: "📋", administrative: "📋",
+  automate: "⚙️", automation: "⚙️", automated: "⚙️", predict: "🔮", predictive: "🔮",
   
   // Technology & AI
-  ai: "🤖", robot: "🤖", automation: "⚙️", machine: "🖥️", algorithm: "🧮", code: "💻",
+  ai: "🤖", robot: "🤖", machine: "🖥️", algorithm: "🧮", code: "💻",
   chip: "🔌", database: "🗄️", cloud: "☁️", server: "🖥️", digital: "📱", tech: "💻",
   
   // Business & Finance
@@ -103,13 +105,41 @@ const ICON_MAP = {
   
   // General Purpose
   key: "🔑", lock: "🔐", search: "🔍", settings: "⚙️", home: "🏠", location: "📍",
-  time: "⏰", speed: "⚡", quality: "✨", premium: "👑", award: "🏅", gift: "🎁"
+  time: "⏰", speed: "⚡", quality: "✨", premium: "👑", award: "🏅", gift: "🎁",
+  task: "📋", tasks: "📋", process: "⚙️", step: "👣", steps: "👣", workflow: "🔄"
 };
 
+// Smart icon lookup with fallbacks
 const getIconEmoji = (key) => {
-  if (!key) return "◼";
-  const lowerKey = key.toLowerCase();
-  return ICON_MAP[lowerKey] || ICON_MAP[lowerKey.split(/[-_ ]/)[0]] || "◼";
+  if (!key) return "📌";
+  const lowerKey = key.toLowerCase().trim();
+  
+  // Direct match
+  if (ICON_MAP[lowerKey]) return ICON_MAP[lowerKey];
+  
+  // Try removing common suffixes
+  const baseName = lowerKey.replace(/s$/, '').replace(/ing$/, '').replace(/ed$/, '').replace(/tion$/, '');
+  if (ICON_MAP[baseName]) return ICON_MAP[baseName];
+  
+  // Try first word if hyphenated or underscored
+  const firstPart = lowerKey.split(/[-_ ]/)[0];
+  if (ICON_MAP[firstPart]) return ICON_MAP[firstPart];
+  
+  // Try to find partial match
+  const keys = Object.keys(ICON_MAP);
+  for (const iconKey of keys) {
+    if (lowerKey.includes(iconKey) || iconKey.includes(lowerKey)) {
+      return ICON_MAP[iconKey];
+    }
+  }
+  
+  // Default fallback based on common categories
+  if (lowerKey.includes('health') || lowerKey.includes('medic') || lowerKey.includes('care')) return "⚕️";
+  if (lowerKey.includes('tech') || lowerKey.includes('digital') || lowerKey.includes('ai')) return "🤖";
+  if (lowerKey.includes('business') || lowerKey.includes('work')) return "💼";
+  if (lowerKey.includes('learn') || lowerKey.includes('edu')) return "📚";
+  
+  return "📌";
 };
 
 const getPaletteColors = (palette, isDark) => {
