@@ -6,13 +6,19 @@ from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
 from pathlib import Path
-from pydantic import BaseModel, Field, ConfigDict
-from typing import List, Optional
+from pydantic import BaseModel, Field
+from typing import List, Optional, Dict, Any
 import uuid
 from datetime import datetime, timezone
 import pdfplumber
 import tempfile
-import asyncio
+import json
+import base64
+
+# Import our prompt compiler
+from compiler.prompt_compiler import compile_prompt, validate_blueprint
+
+# Import emergentintegrations for AI
 from emergentintegrations.llm.chat import LlmChat, UserMessage
 
 ROOT_DIR = Path(__file__).parent
@@ -24,7 +30,7 @@ client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
 # Create the main app without a prefix
-app = FastAPI()
+app = FastAPI(title="Infographic MVP API", version="2.0.0")
 
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
@@ -36,39 +42,22 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Define Models
-class StatusCheck(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    client_name: str
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+# Ensure debug directory exists
+DEBUG_DIR = Path("/tmp/debug")
+DEBUG_DIR.mkdir(exist_ok=True)
 
-class StatusCheckCreate(BaseModel):
-    client_name: str
 
-class InfographicBlock(BaseModel):
-    id: int
-    icon: str
-    heading: str
-    bullets: List[str]
+def save_debug_file(filename: str, content: str):
+    """Save content to debug directory."""
+    try:
+        filepath = DEBUG_DIR / filename
+        with open(filepath, 'w') as f:
+            f.write(content)
+        logger.info(f"Debug file saved: {filepath}")
+    except Exception as e:
+        logger.error(f"Failed to save debug file {filename}: {e}")
 
-class InfographicStyle(BaseModel):
-    palette: str
 
-class InfographicData(BaseModel):
-    title: str
-    subtitle: str
-    layout: str
-    style: InfographicStyle
-    blocks: List[InfographicBlock]
-
-class GenerateResponse(BaseModel):
-    ok: bool
-    infographic: Optional[InfographicData] = None
-    error: Optional[str] = None
-    raw: Optional[str] = None
-
-# Helper functions
 def extract_text_from_pdf(file_path: str) -> str:
     """Extract text from a PDF file using pdfplumber."""
     text = ""
@@ -83,63 +72,158 @@ def extract_text_from_pdf(file_path: str) -> str:
         raise HTTPException(status_code=400, detail=f"Failed to extract text from PDF: {str(e)}")
     return text.strip()
 
+
 def prepare_payload_text(input_text: str, max_length: int = 15000) -> str:
     """Trim input text to maximum length."""
     if not input_text:
         return ""
     return input_text[:max_length] if len(input_text) > max_length else input_text
 
-async def call_gemini_for_infographic(input_text: str) -> dict:
-    """Call Gemini API to generate infographic JSON."""
+
+# Gemini system prompt for Visual Blueprint generation
+GEMINI_BLUEPRINT_PROMPT = '''SYSTEM:
+You are a document understanding assistant. Your ONLY job is to read the provided professional report text and output a single VALID JSON object following the exact Visual Blueprint Schema provided. DO NOT output any explanation, commentary, HTML, or image prompts. Output MUST be valid JSON and conform strictly to schema.
+
+USER:
+Report text:
+<<START>>
+{document_text}
+<<END>>
+
+TASK:
+- Understand the report's structure, intent, and decision points.
+- Identify: (1) problems/risk (before), (2) actions taken (after), (3) findings, (4) clear recommendations, (5) outcomes.
+- Produce "summary" (1-2 sentences) and populate "sections" using types: before_after, findings_actions, recommendations, outcome.
+- Choose a "layout" suggestion (one of: before_after_with_recommendations, split_two_column, process_flow, summary_grid) that best fits the report.
+- Set "creativity" to one of: none, subtle, moderate, high — based on how metaphorical or storytelling-oriented the visual can be.
+- Use "visual_metaphor" to suggest imagery or metaphors for each section (short phrases only, max 10 words).
+- Keep each text item concise (≤12 words).
+- Return EXACTLY the JSON object and NOTHING ELSE.
+
+REQUIRED JSON SCHEMA:
+{{
+  "title": "string (max 100 chars)",
+  "subtitle": "string (max 150 chars)",
+  "summary": "string (1-2 sentences, max 300 chars)",
+  "tone": "professional" | "executive" | "technical",
+  "creativity": "none" | "subtle" | "moderate" | "high",
+  "layout": "before_after_with_recommendations" | "split_two_column" | "process_flow" | "summary_grid",
+  "palette": "teal" | "warm" | "mono",
+  "sections": [
+    {{
+      "id": "string",
+      "type": "before_after" | "findings_actions" | "recommendations" | "outcome" | "metric",
+      "heading": "string (max 80 chars)",
+      "before": ["string"],           // only for before_after
+      "after": ["string"],            // only for before_after
+      "findings": ["string"],         // for findings_actions
+      "actions": ["string"],          // for findings_actions
+      "items": ["string"],            // for recommendations
+      "points": ["string"],           // for outcome/metric
+      "visual_metaphor": "string (max 50 chars)",
+      "metaphor_direction": "left_vs_right" | "top_vs_bottom" | "overlay",
+      "emphasis": "low" | "medium" | "high"
+    }}
+  ]
+}}
+
+EXAMPLE (for guidance only):
+{{
+  "title": "Network & CCTV System Overhaul",
+  "subtitle": "From Chaos to Control — Saifee Villa",
+  "summary": "On-site audit found major rack and CCTV risks; actions implemented.",
+  "tone": "professional",
+  "creativity": "moderate",
+  "layout": "before_after_with_recommendations",
+  "palette": "teal",
+  "sections": [
+    {{
+      "id": "rack",
+      "type": "before_after",
+      "heading": "Network Rack & Power Management",
+      "before": ["Unorganized rack", "Mixed PoE and non-PoE"],
+      "after": ["Reorganized rack", "All devices on UPS"],
+      "visual_metaphor": "tangled cables vs neat rack",
+      "metaphor_direction": "left_vs_right",
+      "emphasis": "high"
+    }}
+  ]
+}}
+
+IMPORTANT: Return EXACTLY the JSON object and NOTHING ELSE. No markdown, no code blocks, no explanation.'''
+
+
+async def call_gemini_for_blueprint(input_text: str) -> Dict[str, Any]:
+    """Call Gemini API to generate Visual Blueprint JSON."""
     api_key = os.environ.get('EMERGENT_LLM_KEY', '')
     if not api_key:
         raise HTTPException(status_code=500, detail="EMERGENT_LLM_KEY not configured")
     
-    prompt = f"""SYSTEM: You are an assistant that MUST output a single valid JSON object and NOTHING ELSE. The JSON will describe an infographic for direct rendering. Follow the JSON schema exactly.
-
-USER INPUT: 
-<<START USER CONTENT>>
-{input_text}
-<<END USER CONTENT>>
-
-TASK: Extract one title, a one-line subtitle, choose a layout from ["vertical_steps","timeline","grid"], pick a palette from ["teal","warm","mono"], and produce between 3 and 6 content blocks. Each block must have an integer id, an icon keyword (single word), a short heading (3–6 words), and 1–3 bullets (each ≤10 words). Keep everything concise. Do NOT include any commentary or extra fields.
-
-REQUIRED JSON SCHEMA (exact):
-{{
-  "title": string,
-  "subtitle": string,
-  "layout": "vertical_steps"|"timeline"|"grid",
-  "style": {{ "palette": "teal"|"warm"|"mono" }},
-  "blocks": [
-    {{ "id": integer, "icon": string, "heading": string, "bullets": [string] }}
-  ]
-}}
-
-IMPORTANT: Return EXACTLY the JSON object and nothing else. No markdown code blocks, no explanation, just the raw JSON."""
-
+    prompt = GEMINI_BLUEPRINT_PROMPT.format(document_text=input_text)
+    
     try:
         chat = LlmChat(
             api_key=api_key,
             session_id=str(uuid.uuid4()),
-            system_message="You are a JSON-only response assistant. You must always respond with valid JSON and nothing else."
+            system_message="You are a JSON-only response assistant. Output valid JSON and nothing else."
         )
         chat.with_model("gemini", "gemini-2.5-flash")
         
         user_message = UserMessage(text=prompt)
         response = await chat.send_message(user_message)
         
-        logger.info(f"Gemini raw response: {response[:500]}...")
+        logger.info(f"Gemini raw response (first 500 chars): {response[:500]}...")
+        
+        # Save raw response for debugging
+        save_debug_file("raw_model_output.txt", response)
+        
         return {"text": response}
     except Exception as e:
         logger.error(f"Gemini API error: {e}")
         raise HTTPException(status_code=500, detail=f"Gemini API error: {str(e)}")
 
-def parse_json_response(text: str) -> dict:
-    """Parse JSON from the model response, handling markdown code blocks and extracting valid JSON."""
-    import json
-    import re
+
+async def call_nano_banana_for_image(compiled_prompt: str) -> Dict[str, Any]:
+    """Call Nano Banana Pro API to generate infographic image."""
+    api_key = os.environ.get('EMERGENT_LLM_KEY', '')
+    if not api_key:
+        raise HTTPException(status_code=500, detail="EMERGENT_LLM_KEY not configured")
     
-    # Clean up the response - remove markdown code blocks if present
+    try:
+        chat = LlmChat(
+            api_key=api_key,
+            session_id=str(uuid.uuid4()),
+            system_message="You are an AI image generation assistant."
+        )
+        chat.with_model("gemini", "gemini-3-pro-image-preview").with_params(modalities=["image", "text"])
+        
+        user_message = UserMessage(text=compiled_prompt)
+        text_response, images = await chat.send_message_multimodal_response(user_message)
+        
+        logger.info(f"Nano Banana response - text: {text_response[:100] if text_response else 'None'}...")
+        logger.info(f"Nano Banana generated {len(images) if images else 0} image(s)")
+        
+        # Save response metadata for debugging (not the full base64)
+        debug_info = {
+            "text_response": text_response[:500] if text_response else None,
+            "num_images": len(images) if images else 0,
+            "image_types": [img.get('mime_type') for img in images] if images else []
+        }
+        save_debug_file("nanobanana_response.json", json.dumps(debug_info, indent=2))
+        
+        return {
+            "text": text_response,
+            "images": images
+        }
+    except Exception as e:
+        logger.error(f"Nano Banana API error: {e}")
+        raise HTTPException(status_code=502, detail=f"Image generation failed: {str(e)}")
+
+
+def parse_json_response(text: str) -> Dict[str, Any]:
+    """Parse JSON from the model response, handling markdown code blocks."""
+    
+    # Clean up the response
     cleaned = text.strip()
     if cleaned.startswith("```json"):
         cleaned = cleaned[7:]
@@ -155,82 +239,30 @@ def parse_json_response(text: str) -> dict:
     except json.JSONDecodeError:
         pass
     
-    # Try to extract JSON object using regex - find the outermost { }
+    # Try to extract JSON object using brace matching
     try:
-        # Find the first { and last } to extract the JSON object
         start = cleaned.find('{')
         end = cleaned.rfind('}')
         if start != -1 and end != -1 and end > start:
             json_str = cleaned[start:end+1]
-            # Try to parse
-            try:
-                return json.loads(json_str)
-            except json.JSONDecodeError:
-                pass
-            
-            # Try to fix common issues - remove any text that appears in the middle
-            # by reconstructing from matched braces
-            depth = 0
-            result = []
-            in_string = False
-            escape = False
-            
-            for i, char in enumerate(json_str):
-                if escape:
-                    escape = False
-                    result.append(char)
-                    continue
-                if char == '\\':
-                    escape = True
-                    result.append(char)
-                    continue
-                if char == '"' and not escape:
-                    in_string = not in_string
-                
-                if not in_string:
-                    if char == '{':
-                        depth += 1
-                    elif char == '}':
-                        depth -= 1
-                
-                result.append(char)
-                
-                # If we're back to depth 0, we found the complete JSON
-                if depth == 0 and char == '}':
-                    break
-            
-            final_json = ''.join(result)
-            try:
-                return json.loads(final_json)
-            except json.JSONDecodeError as e:
-                logger.error(f"JSON parse error after extraction: {e}, text: {final_json[:200]}")
-                raise ValueError(f"Invalid JSON: {str(e)}")
+            return json.loads(json_str)
+    except json.JSONDecodeError as e:
+        logger.error(f"JSON parse error: {e}")
+        raise ValueError(f"Invalid JSON: {str(e)}")
     
-    except Exception as e:
-        logger.error(f"JSON extraction error: {e}, original text: {cleaned[:200]}")
-        raise ValueError(f"Could not extract valid JSON: {str(e)}")
+    raise ValueError("Could not extract valid JSON from response")
+
 
 # Routes
 @api_router.get("/")
 async def root():
-    return {"message": "Infographic MVP API"}
+    return {"message": "Infographic MVP API v2.0 - Gemini Blueprint → Nano Banana Pro Pipeline"}
 
-@api_router.post("/status", response_model=StatusCheck)
-async def create_status_check(input: StatusCheckCreate):
-    status_dict = input.model_dump()
-    status_obj = StatusCheck(**status_dict)
-    doc = status_obj.model_dump()
-    doc['timestamp'] = doc['timestamp'].isoformat()
-    _ = await db.status_checks.insert_one(doc)
-    return status_obj
 
-@api_router.get("/status", response_model=List[StatusCheck])
-async def get_status_checks():
-    status_checks = await db.status_checks.find({}, {"_id": 0}).to_list(1000)
-    for check in status_checks:
-        if isinstance(check['timestamp'], str):
-            check['timestamp'] = datetime.fromisoformat(check['timestamp'])
-    return status_checks
+@api_router.get("/health")
+async def health_check():
+    return {"status": "healthy", "version": "2.0.0"}
+
 
 @api_router.post("/generate")
 async def generate_infographic(
@@ -239,24 +271,29 @@ async def generate_infographic(
 ):
     """
     Generate an infographic from PDF file or text prompt.
-    Accepts multipart/form-data with optional 'file' (PDF) and 'prompt' (text).
+    
+    Pipeline:
+    1. Extract text from PDF/prompt
+    2. Call Gemini to generate Visual Blueprint JSON
+    3. Validate blueprint against schema
+    4. Compile blueprint into Nano Banana Pro prompt
+    5. Call Nano Banana Pro to generate image
+    6. Return image as base64
     """
     user_text = (prompt or "").strip()
     temp_path = None
     
     try:
-        # Handle PDF file upload
+        # Step 1: Handle PDF file upload
         if file and file.filename:
             if not file.filename.lower().endswith('.pdf'):
                 raise HTTPException(status_code=400, detail="Only PDF files are supported")
             
-            # Save to temp file
             with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as temp_file:
                 content = await file.read()
                 temp_file.write(content)
                 temp_path = temp_file.name
             
-            # Extract text from PDF
             extracted_text = extract_text_from_pdf(temp_path)
             if extracted_text:
                 user_text = (user_text + "\n\n" + extracted_text) if user_text else extracted_text
@@ -268,32 +305,71 @@ async def generate_infographic(
         input_text = prepare_payload_text(user_text)
         logger.info(f"Processing input text of length: {len(input_text)}")
         
-        # Call Gemini API
-        response = await call_gemini_for_infographic(input_text)
-        raw_text = response.get("text", "")
+        # Step 2: Call Gemini for Visual Blueprint
+        logger.info("Calling Gemini for Visual Blueprint...")
+        gemini_response = await call_gemini_for_blueprint(input_text)
+        raw_text = gemini_response.get("text", "")
         
-        # Parse JSON response
+        # Step 3: Parse and validate blueprint
         try:
-            parsed = parse_json_response(raw_text)
+            blueprint = parse_json_response(raw_text)
         except ValueError as e:
+            save_debug_file("raw_model_output.txt", raw_text)
             return JSONResponse(
                 status_code=500,
-                content={"ok": False, "error": "Model output not valid JSON", "raw": raw_text}
+                content={"ok": False, "error": "Model output not valid JSON", "raw": raw_text[:2000]}
             )
         
-        # Validate required fields
-        if not parsed.get("title") or not isinstance(parsed.get("blocks"), list):
+        # Save valid blueprint
+        save_debug_file("blueprint.json", json.dumps(blueprint, indent=2))
+        
+        # Validate blueprint
+        is_valid, error_msg = validate_blueprint(blueprint)
+        if not is_valid:
             return JSONResponse(
                 status_code=500,
-                content={"ok": False, "error": "Parsed JSON missing required fields", "parsed": parsed}
+                content={"ok": False, "error": f"Blueprint validation failed: {error_msg}", "blueprint": blueprint}
             )
         
-        return {"ok": True, "infographic": parsed}
+        # Step 4: Compile blueprint into Nano Banana prompt
+        logger.info("Compiling blueprint into Nano Banana prompt...")
+        compiled_prompt = compile_prompt(blueprint)
+        save_debug_file("compiled_prompt.txt", compiled_prompt)
+        logger.info(f"Compiled prompt length: {len(compiled_prompt)} chars")
+        
+        # Step 5: Call Nano Banana Pro for image generation
+        logger.info("Calling Nano Banana Pro for image generation...")
+        image_response = await call_nano_banana_for_image(compiled_prompt)
+        
+        images = image_response.get("images", [])
+        if not images:
+            return JSONResponse(
+                status_code=502,
+                content={"ok": False, "error": "No image generated by Nano Banana Pro"}
+            )
+        
+        # Get the first image
+        image_data = images[0]
+        image_base64 = image_data.get("data", "")
+        mime_type = image_data.get("mime_type", "image/png")
+        
+        # Return success response
+        return {
+            "ok": True,
+            "blueprint": blueprint,
+            "image": {
+                "data": image_base64,
+                "mime_type": mime_type
+            },
+            "compiled_prompt_preview": compiled_prompt[:500] + "..."
+        }
         
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Generate error: {e}")
+        import traceback
+        traceback.print_exc()
         return JSONResponse(
             status_code=500,
             content={"ok": False, "error": str(e)}
@@ -305,6 +381,33 @@ async def generate_infographic(
                 os.unlink(temp_path)
             except Exception as e:
                 logger.warning(f"Failed to delete temp file: {e}")
+
+
+@api_router.get("/debug/blueprint")
+async def get_debug_blueprint():
+    """Get the last generated blueprint for debugging."""
+    try:
+        filepath = DEBUG_DIR / "blueprint.json"
+        if filepath.exists():
+            with open(filepath, 'r') as f:
+                return json.load(f)
+        return {"error": "No blueprint found"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@api_router.get("/debug/prompt")
+async def get_debug_prompt():
+    """Get the last compiled prompt for debugging."""
+    try:
+        filepath = DEBUG_DIR / "compiled_prompt.txt"
+        if filepath.exists():
+            with open(filepath, 'r') as f:
+                return {"prompt": f.read()}
+        return {"error": "No compiled prompt found"}
+    except Exception as e:
+        return {"error": str(e)}
+
 
 # Include the router in the main app
 app.include_router(api_router)

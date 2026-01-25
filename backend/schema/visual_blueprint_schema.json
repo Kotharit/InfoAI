@@ -1,0 +1,118 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Visual Blueprint Schema",
+  "description": "Schema for infographic visual blueprint JSON",
+  "type": "object",
+  "required": ["title", "subtitle", "summary", "tone", "creativity", "layout", "palette", "sections"],
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "Main title of the infographic",
+      "maxLength": 100
+    },
+    "subtitle": {
+      "type": "string",
+      "description": "Subtitle or tagline",
+      "maxLength": 150
+    },
+    "summary": {
+      "type": "string",
+      "description": "1-2 sentence executive summary",
+      "maxLength": 300
+    },
+    "tone": {
+      "type": "string",
+      "enum": ["professional", "executive", "technical"],
+      "description": "Overall tone of the infographic"
+    },
+    "creativity": {
+      "type": "string",
+      "enum": ["none", "subtle", "moderate", "high"],
+      "description": "Level of metaphorical/storytelling elements"
+    },
+    "layout": {
+      "type": "string",
+      "enum": ["before_after_with_recommendations", "split_two_column", "process_flow", "summary_grid"],
+      "description": "Layout style for the infographic"
+    },
+    "palette": {
+      "type": "string",
+      "enum": ["teal", "warm", "mono", "custom"],
+      "description": "Color palette to use"
+    },
+    "custom_colors": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Custom hex colors if palette is 'custom'"
+    },
+    "sections": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "required": ["id", "type", "heading", "emphasis"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier for the section"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["before_after", "findings_actions", "recommendations", "outcome", "metric"],
+            "description": "Type of section content"
+          },
+          "heading": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "before": {
+            "type": "array",
+            "items": { "type": "string", "maxLength": 60 },
+            "description": "Before state items (for before_after type)"
+          },
+          "after": {
+            "type": "array",
+            "items": { "type": "string", "maxLength": 60 },
+            "description": "After state items (for before_after type)"
+          },
+          "findings": {
+            "type": "array",
+            "items": { "type": "string", "maxLength": 60 },
+            "description": "Findings (for findings_actions type)"
+          },
+          "actions": {
+            "type": "array",
+            "items": { "type": "string", "maxLength": 60 },
+            "description": "Actions taken (for findings_actions type)"
+          },
+          "items": {
+            "type": "array",
+            "items": { "type": "string", "maxLength": 60 },
+            "description": "Recommendation items (for recommendations type)"
+          },
+          "points": {
+            "type": "array",
+            "items": { "type": "string", "maxLength": 60 },
+            "description": "Key points (for outcome/metric type)"
+          },
+          "visual_metaphor": {
+            "type": "string",
+            "maxLength": 50,
+            "description": "Short visual metaphor description"
+          },
+          "metaphor_direction": {
+            "type": "string",
+            "enum": ["left_vs_right", "top_vs_bottom", "overlay"],
+            "description": "How to position the metaphor visually"
+          },
+          "emphasis": {
+            "type": "string",
+            "enum": ["low", "medium", "high"],
+            "description": "Visual prominence of this section"
+          }
+        }
+      }
+    }
+  }
+}
