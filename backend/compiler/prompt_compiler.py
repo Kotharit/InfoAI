@@ -94,30 +94,84 @@ CREATIVITY_MODIFIERS = {
     }
 }
 
-# Section type templates
+# Section type templates - VISUAL-FOCUSED (minimal text)
 SECTION_TEMPLATES = {
     "before_after": """
-{heading} Section (Before/After Comparison):
-  LEFT (BEFORE):
-    - Visual: {before_visual}
-    - Label: "Before" or "Problem State"
-    - Items to depict: {before_items}
-    - Mood: Chaotic, problematic, concerning
+{heading} Section (Before/After Visual Comparison):
+  ⚠️ USE ILLUSTRATIONS NOT TEXT for this section
+  
+  LEFT (BEFORE) - Create an ILLUSTRATION showing:
+    - Visual scene depicting: {before_visual}
+    - Single word label: "BEFORE"
+    - Show through imagery: {before_items}
+    - Visual mood: Chaotic, messy, problematic (use visual cues like tangled elements, warning colors)
     {metaphor_before}
   
-  RIGHT (AFTER):
-    - Visual: {after_visual}
-    - Label: "After" or "Solution State"
-    - Items to depict: {after_items}
-    - Mood: Organized, resolved, optimistic
+  RIGHT (AFTER) - Create an ILLUSTRATION showing:
+    - Visual scene depicting: {after_visual}
+    - Single word label: "AFTER"  
+    - Show through imagery: {after_items}
+    - Visual mood: Organized, clean, resolved (use visual cues like neat arrangements, success colors)
     {metaphor_after}
   
   Emphasis: {emphasis}
+  DO NOT write out the items as text - DRAW them as illustrations
 """,
     "findings_actions": """
-{heading} Section (Findings → Actions):
-  FINDINGS (left/top):
-    - Items: {findings_items}
+{heading} Section (Visual Findings → Actions):
+  ⚠️ USE ICONS AND SYMBOLS NOT TEXT
+  
+  FINDINGS (left/top) - Show with ICONS:
+    - Use magnifying glass or observation icons
+    - Represent each finding with a simple icon, NOT text: {findings_items}
+  
+  ACTIONS (right/bottom) - Show with ICONS:
+    - Use checkmark or tool icons
+    - Represent each action with a simple icon, NOT text: {actions_items}
+  
+  {metaphor_line}
+  Emphasis: {emphasis}
+  Maximum 1-2 word labels per icon
+""",
+    "recommendations": """
+{heading} Section (Recommendations - Visual Callout):
+  ⚠️ USE CHECKMARK ICONS NOT BULLET TEXT
+  
+  Style: Highlighted box with ICONS
+  - Use large checkmark or lightbulb icons
+  - Each recommendation shown as an ICON with 1-2 word label max:
+{items_formatted}
+  
+  {metaphor_line}
+  Emphasis: {emphasis} - {emphasis_instruction}
+  DO NOT write full sentences - use icons with tiny labels only
+""",
+    "outcome": """
+{heading} Section (Outcome - Visual Summary):
+  ⚠️ USE SUCCESS ICONS AND IMAGERY
+  
+  Style: Trophy, star, or success imagery
+  - Show outcomes through visual symbols, NOT text paragraphs
+  - Each point as an icon with 1-word label:
+{points_formatted}
+  
+  {metaphor_line}
+  Emphasis: {emphasis}
+""",
+    "metric": """
+{heading} Section (Metrics - Visual Data):
+  ⚠️ USE CHARTS, GAUGES, OR LARGE NUMBERS
+  
+  Style: Data visualization with minimal text
+  - Use pie charts, bar charts, or gauge icons
+  - Numbers displayed large with single-word labels
+  - Points to visualize:
+{points_formatted}
+  
+  {metaphor_line}
+  Emphasis: {emphasis}
+"""
+}
     - Visual style: Observation markers, magnifying glass or search icons
   
   ACTIONS (right/bottom):
