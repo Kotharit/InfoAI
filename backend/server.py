@@ -6,7 +6,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
 from pathlib import Path
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 import uuid
 from datetime import datetime, timezone
@@ -20,7 +20,6 @@ from compiler.prompt_compiler import compile_prompt, validate_blueprint
 
 # Import Google GenAI SDK for text generation (using user's key)
 from google import genai
-from google.genai import types
 
 # Import emergentintegrations for image generation (using Emergent key)
 from emergentintegrations.llm.chat import LlmChat, UserMessage
@@ -52,6 +51,12 @@ logger = logging.getLogger(__name__)
 # Ensure debug directory exists
 DEBUG_DIR = Path("/tmp/debug")
 DEBUG_DIR.mkdir(exist_ok=True)
+
+# Simple user database (in production, use proper hashing)
+USERS = {
+    "admin": {"password": "admin123", "role": "admin"},
+    "contributor": {"password": "contrib123", "role": "contributor"}
+}
 
 
 def save_debug_file(filename: str, content: str):
@@ -87,22 +92,60 @@ def prepare_payload_text(input_text: str, max_length: int = 15000) -> str:
     return input_text[:max_length] if len(input_text) > max_length else input_text
 
 
-# Gemini system prompt for Visual Blueprint generation
-GEMINI_BLUEPRINT_PROMPT = '''You are a document understanding assistant. Your ONLY job is to read the provided professional report text and output a single VALID JSON object following the exact Visual Blueprint Schema provided. DO NOT output any explanation, commentary, HTML, or image prompts. Output MUST be valid JSON and conform strictly to schema.
+def build_gemini_prompt(document_text: str, settings: Dict[str, Any]) -> str:
+    """Build the Gemini prompt with user settings."""
+    
+    layout = settings.get("layout", "before_after_with_recommendations")
+    creativity = settings.get("creativity", "moderate")
+    palette = settings.get("palette", "teal")
+    text_density = settings.get("textDensity", "balanced")
+    tone = settings.get("tone", "professional")
+    
+    # Map tone to JSON tone value
+    tone_mapping = {
+        "professional": "professional",
+        "creative": "executive"  # creative maps to more expressive executive style
+    }
+    json_tone = tone_mapping.get(tone, "professional")
+    
+    # Text density instructions
+    text_instructions = {
+        "low": "Use minimal text. Focus on visual elements and icons. Each bullet point should be 3-5 words max.",
+        "balanced": "Balance text and visuals. Each bullet point should be 6-10 words.",
+        "high": "Include detailed text. Each bullet point can be 10-15 words with more context."
+    }
+    text_instruction = text_instructions.get(text_density, text_instructions["balanced"])
+    
+    # Tone instructions
+    tone_instructions = {
+        "professional": "Maintain a formal, business-appropriate tone. Focus on clarity and precision.",
+        "creative": "Use engaging, storytelling language. Be more expressive and use vivid metaphors."
+    }
+    tone_instruction = tone_instructions.get(tone, tone_instructions["professional"])
+    
+    prompt = f'''You are a document understanding assistant. Your ONLY job is to read the provided professional report text and output a single VALID JSON object following the exact Visual Blueprint Schema provided. DO NOT output any explanation, commentary, HTML, or image prompts. Output MUST be valid JSON and conform strictly to schema.
 
 Report text:
 <<START>>
 {document_text}
 <<END>>
 
+USER PREFERENCES:
+- Preferred Layout: {layout}
+- Creativity Level: {creativity}
+- Color Palette: {palette}
+- Text Density: {text_density} - {text_instruction}
+- Tone: {tone} - {tone_instruction}
+
 TASK:
 - Understand the report's structure, intent, and decision points.
 - Identify: (1) problems/risk (before), (2) actions taken (after), (3) findings, (4) clear recommendations, (5) outcomes.
 - Produce "summary" (1-2 sentences) and populate "sections" using types: before_after, findings_actions, recommendations, outcome.
-- Choose a "layout" suggestion (one of: before_after_with_recommendations, split_two_column, process_flow, summary_grid) that best fits the report.
-- Set "creativity" to one of: none, subtle, moderate, high — based on how metaphorical or storytelling-oriented the visual can be.
+- Use the preferred layout: "{layout}"
+- Set creativity to: "{creativity}"
+- Use palette: "{palette}"
+- Set tone to: "{json_tone}"
 - Use "visual_metaphor" to suggest imagery or metaphors for each section (short phrases only, max 10 words).
-- Keep each text item concise (≤12 words).
 - Return EXACTLY the JSON object and NOTHING ELSE.
 
 REQUIRED JSON SCHEMA:
@@ -111,9 +154,9 @@ REQUIRED JSON SCHEMA:
   "subtitle": "string (max 150 chars)",
   "summary": "string (1-2 sentences, max 300 chars)",
   "tone": "professional" | "executive" | "technical",
-  "creativity": "none" | "subtle" | "moderate" | "high",
-  "layout": "before_after_with_recommendations" | "split_two_column" | "process_flow" | "summary_grid",
-  "palette": "teal" | "warm" | "mono",
+  "creativity": "{creativity}",
+  "layout": "{layout}",
+  "palette": "{palette}",
   "sections": [
     {{
       "id": "string",
@@ -133,18 +176,17 @@ REQUIRED JSON SCHEMA:
 }}
 
 IMPORTANT: Return EXACTLY the JSON object and NOTHING ELSE. No markdown, no code blocks, no explanation.'''
+    
+    return prompt
 
 
-async def call_gemini_for_blueprint(input_text: str) -> Dict[str, Any]:
-    """
-    Call Gemini API to generate Visual Blueprint JSON.
-    Uses USER's GEMINI_API_KEY for text generation.
-    """
+async def call_gemini_for_blueprint(input_text: str, settings: Dict[str, Any]) -> Dict[str, Any]:
+    """Call Gemini API to generate Visual Blueprint JSON with user settings."""
     api_key = os.environ.get('GEMINI_API_KEY', '')
     if not api_key:
         raise HTTPException(status_code=500, detail="GEMINI_API_KEY not configured")
     
-    prompt = GEMINI_BLUEPRINT_PROMPT.format(document_text=input_text)
+    prompt = build_gemini_prompt(input_text, settings)
     
     try:
         response = genai_client.models.generate_content(
@@ -152,15 +194,12 @@ async def call_gemini_for_blueprint(input_text: str) -> Dict[str, Any]:
             contents=[prompt],
         )
         
-        # Get the text response
         response_text = ""
         for part in response.candidates[0].content.parts:
             if hasattr(part, 'text') and part.text:
                 response_text += part.text
         
         logger.info(f"Gemini raw response (first 500 chars): {response_text[:500]}...")
-        
-        # Save raw response for debugging
         save_debug_file("raw_model_output.txt", response_text)
         
         return {"text": response_text}
@@ -169,14 +208,21 @@ async def call_gemini_for_blueprint(input_text: str) -> Dict[str, Any]:
         raise HTTPException(status_code=500, detail=f"Gemini API error: {str(e)}")
 
 
-async def call_nano_banana_for_image(compiled_prompt: str) -> Dict[str, Any]:
-    """
-    Call Nano Banana Pro API to generate infographic image.
-    Uses EMERGENT_LLM_KEY for image generation (paid access).
-    """
+async def call_nano_banana_for_image(compiled_prompt: str, settings: Dict[str, Any]) -> Dict[str, Any]:
+    """Call Nano Banana Pro API to generate infographic image."""
     api_key = os.environ.get('EMERGENT_LLM_KEY', '')
     if not api_key:
         raise HTTPException(status_code=500, detail="EMERGENT_LLM_KEY not configured for image generation")
+    
+    # Add text density modifier to prompt
+    text_density = settings.get("textDensity", "balanced")
+    text_modifier = ""
+    if text_density == "low":
+        text_modifier = "\n\nIMPORTANT: Minimize text in the image. Use icons, symbols, and visual elements instead of words where possible. Keep any text very short and concise."
+    elif text_density == "high":
+        text_modifier = "\n\nIMPORTANT: Include detailed text labels and descriptions in the image. Ensure all key information is readable and comprehensive."
+    
+    final_prompt = compiled_prompt + text_modifier
     
     try:
         chat = LlmChat(
@@ -184,15 +230,15 @@ async def call_nano_banana_for_image(compiled_prompt: str) -> Dict[str, Any]:
             session_id=str(uuid.uuid4()),
             system_message="You are an AI image generation assistant."
         )
+        # Using Nano Banana Pro model
         chat.with_model("gemini", "gemini-3-pro-image-preview").with_params(modalities=["image", "text"])
         
-        user_message = UserMessage(text=compiled_prompt)
+        user_message = UserMessage(text=final_prompt)
         text_response, images = await chat.send_message_multimodal_response(user_message)
         
-        logger.info(f"Nano Banana response - text: {text_response[:100] if text_response else 'None'}...")
-        logger.info(f"Nano Banana generated {len(images) if images else 0} image(s)")
+        logger.info(f"Nano Banana Pro response - text: {text_response[:100] if text_response else 'None'}...")
+        logger.info(f"Nano Banana Pro generated {len(images) if images else 0} image(s)")
         
-        # Save response metadata for debugging
         debug_info = {
             "text_response": text_response[:500] if text_response else None,
             "num_images": len(images) if images else 0,
@@ -205,7 +251,7 @@ async def call_nano_banana_for_image(compiled_prompt: str) -> Dict[str, Any]:
             "images": images
         }
     except Exception as e:
-        logger.error(f"Nano Banana API error: {e}")
+        logger.error(f"Nano Banana Pro API error: {e}")
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=502, detail=f"Image generation failed: {str(e)}")
@@ -213,8 +259,6 @@ async def call_nano_banana_for_image(compiled_prompt: str) -> Dict[str, Any]:
 
 def parse_json_response(text: str) -> Dict[str, Any]:
     """Parse JSON from the model response, handling markdown code blocks."""
-    
-    # Clean up the response
     cleaned = text.strip()
     if cleaned.startswith("```json"):
         cleaned = cleaned[7:]
@@ -224,13 +268,11 @@ def parse_json_response(text: str) -> Dict[str, Any]:
         cleaned = cleaned[:-3]
     cleaned = cleaned.strip()
     
-    # First try direct parsing
     try:
         return json.loads(cleaned)
     except json.JSONDecodeError:
         pass
     
-    # Try to extract JSON object using brace matching
     try:
         start = cleaned.find('{')
         end = cleaned.rfind('}')
@@ -244,10 +286,53 @@ def parse_json_response(text: str) -> Dict[str, Any]:
     raise ValueError("Could not extract valid JSON from response")
 
 
-# Routes
+# Auth Models
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+# Auth Routes
+@api_router.post("/auth/login")
+async def login(request: LoginRequest):
+    """Simple login endpoint."""
+    user = USERS.get(request.username)
+    if not user or user["password"] != request.password:
+        return JSONResponse(
+            status_code=401,
+            content={"ok": False, "error": "Invalid username or password"}
+        )
+    
+    return {
+        "ok": True,
+        "user": {
+            "username": request.username,
+            "role": user["role"]
+        }
+    }
+
+
+@api_router.get("/auth/usage/{username}")
+async def get_usage(username: str):
+    """Get usage count for a user."""
+    usage_doc = await db.usage.find_one({"username": username})
+    usage_count = usage_doc.get("count", 0) if usage_doc else 0
+    return {"ok": True, "usage_count": usage_count}
+
+
+async def increment_usage(username: str):
+    """Increment usage count for a user."""
+    await db.usage.update_one(
+        {"username": username},
+        {"$inc": {"count": 1}},
+        upsert=True
+    )
+
+
+# Main Routes
 @api_router.get("/")
 async def root():
-    return {"message": "Infographic MVP API v2.0 - Hybrid: Your Gemini Key (text) + Emergent Key (images)"}
+    return {"message": "Infographic Studio API"}
 
 
 @api_router.get("/health")
@@ -256,29 +341,38 @@ async def health_check():
         "status": "healthy", 
         "version": "2.0.0", 
         "gemini_key_configured": bool(os.environ.get('GEMINI_API_KEY')),
-        "emergent_key_configured": bool(os.environ.get('EMERGENT_LLM_KEY')),
-        "mode": "hybrid"
+        "emergent_key_configured": bool(os.environ.get('EMERGENT_LLM_KEY'))
     }
 
 
 @api_router.post("/generate")
 async def generate_infographic(
     file: Optional[UploadFile] = File(None),
-    prompt: Optional[str] = Form(None)
+    prompt: Optional[str] = Form(None),
+    settings: Optional[str] = Form("{}"),
+    username: Optional[str] = Form("")
 ):
-    """
-    Generate an infographic from PDF file or text prompt.
-    
-    Hybrid Pipeline:
-    1. Extract text from PDF/prompt
-    2. Call Gemini (YOUR KEY) to generate Visual Blueprint JSON
-    3. Validate blueprint against schema
-    4. Compile blueprint into Nano Banana prompt
-    5. Call Nano Banana Pro (EMERGENT KEY) to generate image
-    6. Return image as base64
-    """
+    """Generate an infographic from PDF file or text prompt with user settings."""
     user_text = (prompt or "").strip()
     temp_path = None
+    
+    # Parse settings
+    try:
+        settings_dict = json.loads(settings) if settings else {}
+    except json.JSONDecodeError:
+        settings_dict = {}
+    
+    # Check usage for contributors
+    if username:
+        user = USERS.get(username)
+        if user and user["role"] == "contributor":
+            usage_doc = await db.usage.find_one({"username": username})
+            usage_count = usage_doc.get("count", 0) if usage_doc else 0
+            if usage_count >= 2:
+                return JSONResponse(
+                    status_code=403,
+                    content={"ok": False, "error": "Usage limit reached. Contact admin for more access."}
+                )
     
     try:
         # Step 1: Handle PDF file upload
@@ -298,13 +392,13 @@ async def generate_infographic(
         if not user_text:
             raise HTTPException(status_code=400, detail="No text or file provided")
         
-        # Prepare and trim input
         input_text = prepare_payload_text(user_text)
         logger.info(f"Processing input text of length: {len(input_text)}")
+        logger.info(f"Settings: {settings_dict}")
         
-        # Step 2: Call Gemini for Visual Blueprint (YOUR KEY)
-        logger.info("Calling Gemini (your key) for Visual Blueprint...")
-        gemini_response = await call_gemini_for_blueprint(input_text)
+        # Step 2: Call Gemini for Visual Blueprint with settings
+        logger.info("Calling Gemini for Visual Blueprint...")
+        gemini_response = await call_gemini_for_blueprint(input_text, settings_dict)
         raw_text = gemini_response.get("text", "")
         
         # Step 3: Parse and validate blueprint
@@ -317,10 +411,8 @@ async def generate_infographic(
                 content={"ok": False, "error": "Model output not valid JSON", "raw": raw_text[:2000]}
             )
         
-        # Save valid blueprint
         save_debug_file("blueprint.json", json.dumps(blueprint, indent=2))
         
-        # Validate blueprint
         is_valid, error_msg = validate_blueprint(blueprint)
         if not is_valid:
             return JSONResponse(
@@ -334,23 +426,25 @@ async def generate_infographic(
         save_debug_file("compiled_prompt.txt", compiled_prompt)
         logger.info(f"Compiled prompt length: {len(compiled_prompt)} chars")
         
-        # Step 5: Call Nano Banana Pro for image generation (EMERGENT KEY)
-        logger.info("Calling Nano Banana Pro (Emergent key) for image generation...")
-        image_response = await call_nano_banana_for_image(compiled_prompt)
+        # Step 5: Call Nano Banana Pro for image generation
+        logger.info("Calling Nano Banana Pro for image generation...")
+        image_response = await call_nano_banana_for_image(compiled_prompt, settings_dict)
         
         images = image_response.get("images", [])
         if not images:
             return JSONResponse(
                 status_code=502,
-                content={"ok": False, "error": "No image generated by Nano Banana Pro"}
+                content={"ok": False, "error": "No image generated"}
             )
         
-        # Get the first image
+        # Increment usage for the user
+        if username:
+            await increment_usage(username)
+        
         image_data = images[0]
         image_base64 = image_data.get("data", "")
         mime_type = image_data.get("mime_type", "image/png")
         
-        # Return success response
         return {
             "ok": True,
             "blueprint": blueprint,
@@ -372,7 +466,6 @@ async def generate_infographic(
             content={"ok": False, "error": str(e)}
         )
     finally:
-        # Clean up temp file
         if temp_path and os.path.exists(temp_path):
             try:
                 os.unlink(temp_path)
