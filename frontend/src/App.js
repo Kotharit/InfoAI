@@ -1,10 +1,38 @@
-import { useState, useRef, useEffect, createContext, useContext } from "react";
+import { useState, useEffect, createContext, useContext } from "react";
 import "@/App.css";
-import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useNavigate, Navigate } from "react-router-dom";
 import axios from "axios";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
+
+// Auth Context
+const AuthContext = createContext();
+
+const AuthProvider = ({ children }) => {
+  const [user, setUser] = useState(() => {
+    const saved = localStorage.getItem("user");
+    return saved ? JSON.parse(saved) : null;
+  });
+
+  const login = (userData) => {
+    setUser(userData);
+    localStorage.setItem("user", JSON.stringify(userData));
+  };
+
+  const logout = () => {
+    setUser(null);
+    localStorage.removeItem("user");
+  };
+
+  return (
+    <AuthContext.Provider value={{ user, login, logout }}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+const useAuth = () => useContext(AuthContext);
 
 // Theme Context
 const ThemeContext = createContext();
@@ -66,6 +94,121 @@ const ThemeToggle = () => {
   );
 };
 
+// Login Page
+const LoginPage = () => {
+  const navigate = useNavigate();
+  const { isDark } = useTheme();
+  const { login } = useAuth();
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+
+    try {
+      const response = await axios.post(`${API}/auth/login`, { username, password });
+      if (response.data.ok) {
+        login(response.data.user);
+        navigate("/app");
+      } else {
+        setError(response.data.error || "Login failed");
+      }
+    } catch (err) {
+      setError(err.response?.data?.error || "Login failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className={`min-h-screen flex items-center justify-center transition-colors duration-300 ${isDark ? "bg-gray-900" : "bg-gradient-to-br from-teal-50 via-white to-cyan-50"}`}>
+      <div className={`w-full max-w-md p-8 rounded-2xl shadow-xl ${isDark ? "bg-gray-800 border border-gray-700" : "bg-white"}`}>
+        <div className="text-center mb-8">
+          <div className={`inline-flex items-center justify-center w-16 h-16 rounded-xl mb-4 ${isDark ? "bg-teal-600" : "bg-gradient-to-br from-teal-500 to-cyan-500"}`}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+              <line x1="3" y1="9" x2="21" y2="9"/>
+              <line x1="9" y1="21" x2="9" y2="9"/>
+            </svg>
+          </div>
+          <h1 className={`text-2xl font-bold ${isDark ? "text-white" : "text-gray-900"}`}>Infographic Studio</h1>
+          <p className={`mt-2 ${isDark ? "text-gray-400" : "text-gray-600"}`}>Sign in to continue</p>
+        </div>
+
+        <form onSubmit={handleLogin} className="space-y-4">
+          <div>
+            <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Username</label>
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              className={`w-full p-3 rounded-lg border transition-colors ${
+                isDark 
+                  ? "bg-gray-700 border-gray-600 text-white focus:border-teal-500" 
+                  : "bg-gray-50 border-gray-200 text-gray-900 focus:border-teal-500"
+              } focus:outline-none focus:ring-2 focus:ring-teal-500/20`}
+              placeholder="Enter username"
+              required
+            />
+          </div>
+          <div>
+            <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>Password</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className={`w-full p-3 rounded-lg border transition-colors ${
+                isDark 
+                  ? "bg-gray-700 border-gray-600 text-white focus:border-teal-500" 
+                  : "bg-gray-50 border-gray-200 text-gray-900 focus:border-teal-500"
+              } focus:outline-none focus:ring-2 focus:ring-teal-500/20`}
+              placeholder="Enter password"
+              required
+            />
+          </div>
+
+          {error && (
+            <div className="p-3 rounded-lg bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 text-sm">
+              {error}
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={loading}
+            className={`w-full py-3 px-4 rounded-lg font-semibold transition-all ${
+              loading ? "opacity-50 cursor-not-allowed" : "hover:scale-[1.02]"
+            } ${isDark ? "bg-teal-600 text-white hover:bg-teal-500" : "bg-teal-500 text-white hover:bg-teal-600"}`}
+          >
+            {loading ? "Signing in..." : "Sign In"}
+          </button>
+        </form>
+
+        <div className={`mt-6 p-4 rounded-lg ${isDark ? "bg-gray-700/50" : "bg-gray-50"}`}>
+          <p className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+            <strong>Demo Credentials:</strong><br/>
+            Admin: admin / admin123<br/>
+            Contributor: contributor / contrib123
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Protected Route
+const ProtectedRoute = ({ children }) => {
+  const { user } = useAuth();
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+  return children;
+};
+
 // Landing Page
 const LandingPage = () => {
   const navigate = useNavigate();
@@ -73,10 +216,8 @@ const LandingPage = () => {
 
   return (
     <div className={`min-h-screen transition-colors duration-300 ${isDark ? "bg-gray-900" : "bg-gradient-to-br from-teal-50 via-white to-cyan-50"}`}>
-      {/* Hero Section */}
       <div className="container mx-auto px-6 py-16">
         <div className="text-center max-w-4xl mx-auto">
-          {/* Logo/Brand */}
           <div className="mb-8">
             <div className={`inline-flex items-center justify-center w-20 h-20 rounded-2xl shadow-xl mb-6 ${isDark ? "bg-teal-600" : "bg-gradient-to-br from-teal-500 to-cyan-500"}`}>
               <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -87,27 +228,24 @@ const LandingPage = () => {
             </div>
           </div>
 
-          {/* Headline */}
           <h1 className={`text-5xl md:text-6xl font-bold mb-6 leading-tight ${isDark ? "text-white" : "text-gray-900"}`}>
             Transform Reports into
             <span className={`block ${isDark ? "text-teal-400" : "text-teal-600"}`}>Stunning Visual Stories</span>
           </h1>
 
-          {/* Subtitle */}
           <p className={`text-xl md:text-2xl mb-10 max-w-2xl mx-auto ${isDark ? "text-gray-300" : "text-gray-600"}`}>
             Upload a PDF report and let AI create beautiful, storytelling-oriented infographics with visual metaphors and executive clarity.
           </p>
 
-          {/* CTA Button */}
           <button
-            onClick={() => navigate("/app")}
+            onClick={() => navigate("/login")}
             className={`group inline-flex items-center gap-3 px-8 py-4 text-lg font-semibold rounded-xl shadow-lg transition-all duration-300 hover:scale-105 hover:shadow-xl ${
               isDark 
                 ? "bg-teal-500 text-white hover:bg-teal-400" 
                 : "bg-gradient-to-r from-teal-500 to-cyan-500 text-white hover:from-teal-600 hover:to-cyan-600"
             }`}
           >
-            Create Infographic
+            Get Started
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="group-hover:translate-x-1 transition-transform">
               <line x1="5" y1="12" x2="19" y2="12"/>
               <polyline points="12 5 19 12 12 19"/>
@@ -183,10 +321,10 @@ const LandingPage = () => {
           </h2>
           <div className="grid md:grid-cols-2 gap-8">
             {[
-              { step: "1", title: "Share the Thought", desc: "Upload a report, paste text, or describe your idea. A rough input is enough—clarity will follow.", icon: "📄" },
-              { step: "2", title: "Intelligence Finds Structure", desc: "Our AI reads between the lines. It identifies what matters, organizes complexity, and designs a visual blueprint before a single pixel is drawn.", icon: "🧠" },
-              { step: "3", title: "Intent Becomes Direction", desc: "The blueprint is refined through a deterministic prompt—ensuring consistency, accuracy, and alignment with your message.", icon: "⚙️" },
-              { step: "4", title: "Meaning Becomes Visual", desc: "The final idea is rendered into a clean, expressive infographic—where insight meets aesthetics, and data finally speaks.", icon: "🎨" }
+              { step: "1", title: "Share the Thought", desc: "Upload a report, paste text, or describe your idea. A rough input is enough—clarity will follow." },
+              { step: "2", title: "Intelligence Finds Structure", desc: "Our AI reads between the lines. It identifies what matters, organizes complexity, and designs a visual blueprint." },
+              { step: "3", title: "Intent Becomes Direction", desc: "The blueprint is refined through a deterministic prompt—ensuring consistency, accuracy, and alignment with your message." },
+              { step: "4", title: "Meaning Becomes Visual", desc: "The final idea is rendered into a clean, expressive infographic—where insight meets aesthetics." }
             ].map((item, idx) => (
               <div key={idx} className={`flex gap-4 p-6 rounded-xl ${isDark ? "bg-gray-800/50" : "bg-white/80"}`}>
                 <div className="flex-shrink-0">
@@ -206,7 +344,6 @@ const LandingPage = () => {
         </div>
       </div>
 
-      {/* Footer */}
       <footer className={`py-8 mt-16 border-t ${isDark ? "border-gray-800" : "border-gray-200"}`}>
         <p className={`text-center text-sm ${isDark ? "text-gray-500" : "text-gray-500"}`}>
           Visual Intelligence for Modern Reports
@@ -260,10 +397,41 @@ const LoadingSteps = ({ currentStep }) => {
   );
 };
 
+// Toggle Option Component
+const ToggleOption = ({ label, options, value, onChange, isDark }) => {
+  return (
+    <div className="mb-4">
+      <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+        {label}
+      </label>
+      <div className="flex flex-wrap gap-2">
+        {options.map((option) => (
+          <button
+            key={option.value}
+            onClick={() => onChange(option.value)}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+              value === option.value
+                ? isDark 
+                  ? "bg-teal-600 text-white" 
+                  : "bg-teal-500 text-white"
+                : isDark
+                  ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+            }`}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 // Main App Page
 const MainApp = () => {
   const navigate = useNavigate();
   const { isDark } = useTheme();
+  const { user, logout } = useAuth();
   
   const [prompt, setPrompt] = useState("");
   const [file, setFile] = useState(null);
@@ -274,6 +442,33 @@ const MainApp = () => {
   const [blueprint, setBlueprint] = useState(null);
   const [compiledPromptPreview, setCompiledPromptPreview] = useState("");
   const [showDebug, setShowDebug] = useState(false);
+  const [usageCount, setUsageCount] = useState(0);
+
+  // Settings state
+  const [settings, setSettings] = useState({
+    layout: "before_after_with_recommendations",
+    creativity: "moderate",
+    palette: "teal",
+    textDensity: "balanced",
+    tone: "professional"
+  });
+
+  // Check usage on mount
+  useEffect(() => {
+    const checkUsage = async () => {
+      if (user) {
+        try {
+          const response = await axios.get(`${API}/auth/usage/${user.username}`);
+          if (response.data.ok) {
+            setUsageCount(response.data.usage_count);
+          }
+        } catch (err) {
+          console.error("Failed to check usage:", err);
+        }
+      }
+    };
+    checkUsage();
+  }, [user]);
 
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
@@ -291,6 +486,12 @@ const MainApp = () => {
       return;
     }
 
+    // Check usage limit for contributors
+    if (user?.role === "contributor" && usageCount >= 2) {
+      setStatus({ message: "Usage limit reached. Contact admin for more access.", type: "error" });
+      return;
+    }
+
     setLoading(true);
     setLoadingStep(1);
     setStatus({ message: "", type: "" });
@@ -301,17 +502,17 @@ const MainApp = () => {
     const formData = new FormData();
     if (file) formData.append("file", file);
     formData.append("prompt", prompt);
+    formData.append("settings", JSON.stringify(settings));
+    formData.append("username", user?.username || "");
 
     try {
-      // Simulate step progression
       setLoadingStep(1);
       await new Promise(r => setTimeout(r, 500));
-      
       setLoadingStep(2);
       
       const response = await axios.post(`${API}/generate`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
-        timeout: 120000 // 2 minute timeout for image generation
+        timeout: 120000
       });
 
       setLoadingStep(3);
@@ -323,7 +524,6 @@ const MainApp = () => {
         const { image, blueprint: bp, compiled_prompt_preview } = response.data;
         
         if (image && image.data) {
-          // Set the image with proper data URL format
           const imageDataUrl = `data:${image.mime_type || 'image/png'};base64,${image.data}`;
           setGeneratedImage(imageDataUrl);
         }
@@ -331,6 +531,7 @@ const MainApp = () => {
         setBlueprint(bp);
         setCompiledPromptPreview(compiled_prompt_preview || "");
         setStatus({ message: "Infographic generated successfully!", type: "success" });
+        setUsageCount(prev => prev + 1);
       } else {
         setStatus({ message: response.data.error || "Generation failed", type: "error" });
       }
@@ -360,11 +561,15 @@ const MainApp = () => {
 
   const handleDownload = () => {
     if (!generatedImage) return;
-    
     const link = document.createElement("a");
     link.download = "infographic.png";
     link.href = generatedImage;
     link.click();
+  };
+
+  const handleLogout = () => {
+    logout();
+    navigate("/login");
   };
 
   return (
@@ -386,11 +591,32 @@ const MainApp = () => {
             <span className={`font-bold text-xl ${isDark ? "text-white" : "text-gray-900"}`}>Infographic Studio</span>
           </button>
           <div className="flex items-center gap-4">
+            <div className={`text-sm ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+              <span className="font-medium">{user?.username}</span>
+              <span className={`ml-2 px-2 py-0.5 rounded text-xs ${
+                user?.role === "admin" 
+                  ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400" 
+                  : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+              }`}>
+                {user?.role}
+              </span>
+              {user?.role === "contributor" && (
+                <span className={`ml-2 text-xs ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                  ({usageCount}/2 used)
+                </span>
+              )}
+            </div>
             <button
               onClick={() => setShowDebug(!showDebug)}
               className={`text-xs px-2 py-1 rounded ${isDark ? "bg-gray-700 text-gray-300" : "bg-gray-200 text-gray-600"}`}
             >
               {showDebug ? "Hide Debug" : "Debug"}
+            </button>
+            <button
+              onClick={handleLogout}
+              className={`text-sm px-3 py-1.5 rounded-lg ${isDark ? "bg-gray-700 text-gray-300 hover:bg-gray-600" : "bg-gray-200 text-gray-600 hover:bg-gray-300"}`}
+            >
+              Logout
             </button>
           </div>
         </div>
@@ -409,7 +635,7 @@ const MainApp = () => {
               <textarea
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
-                rows={8}
+                rows={6}
                 placeholder="Paste your report content, site visit notes, or describe what infographic you want..."
                 className={`w-full p-4 rounded-lg border resize-none transition-colors ${
                   isDark 
@@ -435,14 +661,82 @@ const MainApp = () => {
                   }`}
                 />
               </div>
+            </div>
 
-              {/* Action Buttons */}
+            {/* Settings Panel */}
+            <div className={`p-6 rounded-xl ${isDark ? "bg-gray-800 border border-gray-700" : "bg-white shadow-lg border border-gray-100"}`}>
+              <h3 className={`font-semibold mb-4 ${isDark ? "text-white" : "text-gray-900"}`}>
+                ⚙️ Generation Settings
+              </h3>
+              
+              <ToggleOption
+                label="Layout"
+                options={[
+                  { value: "before_after_with_recommendations", label: "Before/After" },
+                  { value: "split_two_column", label: "Two Column" },
+                  { value: "process_flow", label: "Process Flow" },
+                  { value: "summary_grid", label: "Summary Grid" }
+                ]}
+                value={settings.layout}
+                onChange={(v) => setSettings(s => ({ ...s, layout: v }))}
+                isDark={isDark}
+              />
+
+              <ToggleOption
+                label="Creativity"
+                options={[
+                  { value: "none", label: "None" },
+                  { value: "subtle", label: "Subtle" },
+                  { value: "moderate", label: "Moderate" },
+                  { value: "high", label: "High" }
+                ]}
+                value={settings.creativity}
+                onChange={(v) => setSettings(s => ({ ...s, creativity: v }))}
+                isDark={isDark}
+              />
+
+              <ToggleOption
+                label="Palette"
+                options={[
+                  { value: "teal", label: "Teal" },
+                  { value: "warm", label: "Warm" },
+                  { value: "mono", label: "Mono" }
+                ]}
+                value={settings.palette}
+                onChange={(v) => setSettings(s => ({ ...s, palette: v }))}
+                isDark={isDark}
+              />
+
+              <ToggleOption
+                label="Text Density"
+                options={[
+                  { value: "low", label: "Low (Visual)" },
+                  { value: "balanced", label: "Balanced" },
+                  { value: "high", label: "High (Detailed)" }
+                ]}
+                value={settings.textDensity}
+                onChange={(v) => setSettings(s => ({ ...s, textDensity: v }))}
+                isDark={isDark}
+              />
+
+              <ToggleOption
+                label="Tone"
+                options={[
+                  { value: "professional", label: "Professional" },
+                  { value: "creative", label: "Creative" }
+                ]}
+                value={settings.tone}
+                onChange={(v) => setSettings(s => ({ ...s, tone: v }))}
+                isDark={isDark}
+              />
+
+              {/* Generate Button */}
               <div className="mt-6 flex gap-3">
                 <button
                   onClick={handleGenerate}
-                  disabled={loading}
+                  disabled={loading || (user?.role === "contributor" && usageCount >= 2)}
                   className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all ${
-                    loading 
+                    loading || (user?.role === "contributor" && usageCount >= 2)
                       ? "opacity-50 cursor-not-allowed" 
                       : "hover:scale-[1.02]"
                   } ${isDark ? "bg-teal-600 text-white hover:bg-teal-500" : "bg-teal-500 text-white hover:bg-teal-600"}`}
@@ -543,7 +837,6 @@ const MainApp = () => {
                 )}
               </div>
               
-              {/* Image Display */}
               <div className={`rounded-lg overflow-hidden border ${isDark ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-gray-50"}`}>
                 {generatedImage ? (
                   <img 
@@ -560,12 +853,11 @@ const MainApp = () => {
                       <polyline points="21 15 16 10 5 21"/>
                     </svg>
                     <p className="text-lg font-medium">No image generated yet</p>
-                    <p className="text-sm mt-2">Upload a report and click Generate</p>
+                    <p className="text-sm mt-2">Configure settings and click Generate</p>
                   </div>
                 )}
               </div>
 
-              {/* Blueprint Summary */}
               {blueprint && (
                 <div className={`mt-4 p-4 rounded-lg ${isDark ? "bg-gray-700/50" : "bg-gray-50"}`}>
                   <h4 className={`font-semibold mb-2 ${isDark ? "text-white" : "text-gray-900"}`}>
@@ -589,17 +881,24 @@ const MainApp = () => {
 
 function App() {
   return (
-    <ThemeProvider>
-      <div className="App">
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/app" element={<MainApp />} />
-          </Routes>
-        </BrowserRouter>
-        <ThemeToggle />
-      </div>
-    </ThemeProvider>
+    <AuthProvider>
+      <ThemeProvider>
+        <div className="App">
+          <BrowserRouter>
+            <Routes>
+              <Route path="/" element={<LandingPage />} />
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/app" element={
+                <ProtectedRoute>
+                  <MainApp />
+                </ProtectedRoute>
+              } />
+            </Routes>
+          </BrowserRouter>
+          <ThemeToggle />
+        </div>
+      </ThemeProvider>
+    </AuthProvider>
   );
 }
 
