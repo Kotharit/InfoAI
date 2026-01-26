@@ -383,12 +383,9 @@ const MainApp = () => {
                 <line x1="9" y1="21" x2="9" y2="9"/>
               </svg>
             </div>
-            <span className={`font-bold text-xl ${isDark ? "text-white" : "text-gray-900"}`}>Infographic MVP</span>
+            <span className={`font-bold text-xl ${isDark ? "text-white" : "text-gray-900"}`}>Infographic Studio</span>
           </button>
           <div className="flex items-center gap-4">
-            <span className={`text-sm ${isDark ? "text-gray-400" : "text-gray-500"}`}>
-              v2.0 — Gemini → Nano Banana Pro
-            </span>
             <button
               onClick={() => setShowDebug(!showDebug)}
               className={`text-xs px-2 py-1 rounded ${isDark ? "bg-gray-700 text-gray-300" : "bg-gray-200 text-gray-600"}`}
