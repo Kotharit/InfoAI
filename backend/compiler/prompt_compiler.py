@@ -172,47 +172,6 @@ SECTION_TEMPLATES = {
   Emphasis: {emphasis}
 """
 }
-    - Visual style: Observation markers, magnifying glass or search icons
-  
-  ACTIONS (right/bottom):
-    - Items: {actions_items}
-    - Visual style: Check marks, wrench/tool icons, completion indicators
-  
-  {metaphor_line}
-  Emphasis: {emphasis}
-""",
-    "recommendations": """
-{heading} Section (Recommendations Callout):
-  - Style: Prominent highlighted callout box
-  - Background: Slightly contrasting color from main palette
-  - Icons: Checkmarks or lightbulb icons next to each item
-  - Items to display:
-{items_formatted}
-  
-  {metaphor_line}
-  Emphasis: {emphasis} - {emphasis_instruction}
-""",
-    "outcome": """
-{heading} Section (Outcome Summary):
-  - Style: Success-oriented visual treatment
-  - Icons: Trophy, star, or success checkmark
-  - Points:
-{points_formatted}
-  
-  {metaphor_line}
-  Emphasis: {emphasis}
-""",
-    "metric": """
-{heading} Section (Metrics/Data):
-  - Style: Data visualization, numbers prominently displayed
-  - Use charts, gauges, or large numerics where appropriate
-  - Points:
-{points_formatted}
-  
-  {metaphor_line}
-  Emphasis: {emphasis}
-"""
-}
 
 EMPHASIS_INSTRUCTIONS = {
     "low": "Small size, subtle positioning, supporting role",
