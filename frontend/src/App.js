@@ -220,9 +220,9 @@ const LandingPage = () => {
 const LoadingSteps = ({ currentStep }) => {
   const steps = [
     { id: 1, label: "Extracting text from document...", icon: "📄" },
-    { id: 2, label: "Gemini creating visual blueprint...", icon: "🧠" },
-    { id: 3, label: "Compiling image prompt...", icon: "⚙️" },
-    { id: 4, label: "Nano Banana Pro generating image...", icon: "🎨" }
+    { id: 2, label: "AI creating visual blueprint...", icon: "🧠" },
+    { id: 3, label: "Refining image prompt...", icon: "⚙️" },
+    { id: 4, label: "Rendering infographic...", icon: "🎨" }
   ];
 
   return (
