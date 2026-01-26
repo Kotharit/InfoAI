@@ -127,8 +127,8 @@ const LandingPage = () => {
                   <line x1="16" y1="17" x2="8" y2="17"/>
                 </svg>
               ),
-              title: "AI-Powered Analysis",
-              description: "Gemini AI reads your report, identifies key findings, and creates a structured visual blueprint with storytelling elements."
+              title: "AI-Powered Insight",
+              description: "Your reports already contain the truth. Our AI simply listens—extracting meaning, patterns, and intent—then shaping them into a clear visual narrative that speaks without explanation."
             },
             {
               icon: (
@@ -138,8 +138,8 @@ const LandingPage = () => {
                   <polyline points="2 12 12 17 22 12"/>
                 </svg>
               ),
-              title: "Visual Metaphors",
-              description: "Transform boring data into compelling visual narratives with before/after comparisons, creative metaphors, and executive-grade design."
+              title: "Visual Storytelling",
+              description: "Numbers persuade. Stories convince. We translate raw data into visual metaphors—before vs after, cause vs effect, signal vs noise—designed to be understood in seconds and remembered for longer."
             },
             {
               icon: (
@@ -149,8 +149,8 @@ const LandingPage = () => {
                   <line x1="12" y1="15" x2="12" y2="3"/>
                 </svg>
               ),
-              title: "High-Quality Export",
-              description: "Download stunning PNG infographics ready for presentations, reports, and executive communications."
+              title: "Presentation-Ready Output",
+              description: "No redesigns. No polishing. No back-and-forth. Export high-resolution infographics crafted for boardrooms, decks, reports, and decisive conversations."
             }
           ].map((feature, idx) => (
             <div
