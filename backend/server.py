@@ -214,21 +214,59 @@ async def call_nano_banana_for_image(compiled_prompt: str, settings: Dict[str, A
     if not api_key:
         raise HTTPException(status_code=500, detail="EMERGENT_LLM_KEY not configured for image generation")
     
-    # Add text density modifier to prompt
-    text_density = settings.get("textDensity", "balanced")
-    text_modifier = ""
-    if text_density == "low":
-        text_modifier = "\n\nIMPORTANT: Minimize text in the image. Use icons, symbols, and visual elements instead of words where possible. Keep any text very short and concise."
-    elif text_density == "high":
-        text_modifier = "\n\nIMPORTANT: Include detailed text labels and descriptions in the image. Ensure all key information is readable and comprehensive."
+    # Critical text-minimization instructions to prevent spelling errors
+    text_rules = """
+
+=== CRITICAL INSTRUCTIONS FOR ERROR-FREE OUTPUT ===
+⚠️ TEXT RENDERING RULES - FOLLOW STRICTLY:
+
+1. MINIMIZE ALL TEXT - Text in images causes spelling errors
+2. Use ICONS, ILLUSTRATIONS, and VISUAL METAPHORS instead of words
+3. Maximum text allowed:
+   - Title: Yes (keep short)
+   - Subtitle: Yes (keep short)  
+   - Section labels: 1-2 words ONLY (e.g., "BEFORE", "AFTER", "FINDINGS")
+   - Item labels: 1 word MAX or use icons instead
+
+4. NEVER include:
+   - Bullet point lists with text
+   - Paragraphs or sentences
+   - Detailed descriptions as text
+   - Any text longer than 3 words (except title/subtitle)
+
+5. INSTEAD of text, use:
+   - Icons and symbols (checkmarks, warning signs, arrows)
+   - Illustrations showing the concept
+   - Color coding to differentiate
+   - Visual metaphors (tangled vs organized, broken vs fixed)
+   - Charts/graphs for data
+
+6. If you MUST include a label, use only:
+   - Single common words (no complex terms)
+   - ALL CAPS for clarity
+   - Large, simple font
+
+THIS IS CRITICAL: Spelling errors occur when too much text is rendered.
+Keep text to an absolute minimum and let visuals tell the story.
+"""
     
-    final_prompt = compiled_prompt + text_modifier
+    # Add text density specific modifier
+    text_density = settings.get("textDensity", "balanced")
+    density_modifier = ""
+    if text_density == "low":
+        density_modifier = "\n\n⚠️ USER SELECTED 'LOW TEXT': Use ZERO text except title. All content must be purely visual - icons, illustrations, and imagery only."
+    elif text_density == "high":
+        density_modifier = "\n\n⚠️ USER SELECTED 'HIGH TEXT': You may include more labels, but still keep each label to 2-3 words maximum. NO sentences or paragraphs."
+    else:
+        density_modifier = "\n\n⚠️ USER SELECTED 'BALANCED': Minimal text labels (1-2 words each). Focus on visual communication."
+    
+    final_prompt = compiled_prompt + text_rules + density_modifier
     
     try:
         chat = LlmChat(
             api_key=api_key,
             session_id=str(uuid.uuid4()),
-            system_message="You are an AI image generation assistant."
+            system_message="You are an AI image generation assistant that creates visual-first infographics with minimal text to avoid spelling errors."
         )
         # Using Nano Banana Pro model
         chat.with_model("gemini", "gemini-3-pro-image-preview").with_params(modalities=["image", "text"])
