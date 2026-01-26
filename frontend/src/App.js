@@ -176,27 +176,30 @@ const LandingPage = () => {
           ))}
         </div>
 
-        {/* Pipeline Explanation */}
+        {/* How It Works */}
         <div className="mt-24 max-w-4xl mx-auto">
           <h2 className={`text-3xl font-bold text-center mb-12 ${isDark ? "text-white" : "text-gray-900"}`}>
             How It Works
           </h2>
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="grid md:grid-cols-2 gap-8">
             {[
-              { step: "1", title: "Upload Report", desc: "PDF or paste text", icon: "📄" },
-              { step: "2", title: "AI Blueprint", desc: "Gemini creates structure", icon: "🧠" },
-              { step: "3", title: "Prompt Compile", desc: "Deterministic conversion", icon: "⚙️" },
-              { step: "4", title: "Image Gen", desc: "Nano Banana Pro renders", icon: "🎨" }
+              { step: "1", title: "Share the Thought", desc: "Upload a report, paste text, or describe your idea. A rough input is enough—clarity will follow.", icon: "📄" },
+              { step: "2", title: "Intelligence Finds Structure", desc: "Our AI reads between the lines. It identifies what matters, organizes complexity, and designs a visual blueprint before a single pixel is drawn.", icon: "🧠" },
+              { step: "3", title: "Intent Becomes Direction", desc: "The blueprint is refined through a deterministic prompt—ensuring consistency, accuracy, and alignment with your message.", icon: "⚙️" },
+              { step: "4", title: "Meaning Becomes Visual", desc: "The final idea is rendered into a clean, expressive infographic—where insight meets aesthetics, and data finally speaks.", icon: "🎨" }
             ].map((item, idx) => (
-              <div key={idx} className="flex flex-col items-center text-center">
-                <div className={`text-4xl mb-3`}>{item.icon}</div>
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg mb-2 ${
-                  isDark ? "bg-teal-600 text-white" : "bg-teal-500 text-white"
-                }`}>
-                  {item.step}
+              <div key={idx} className={`flex gap-4 p-6 rounded-xl ${isDark ? "bg-gray-800/50" : "bg-white/80"}`}>
+                <div className="flex-shrink-0">
+                  <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg ${
+                    isDark ? "bg-teal-600 text-white" : "bg-teal-500 text-white"
+                  }`}>
+                    {item.step}
+                  </div>
                 </div>
-                <h4 className={`font-semibold ${isDark ? "text-white" : "text-gray-900"}`}>{item.title}</h4>
-                <p className={`text-sm ${isDark ? "text-gray-400" : "text-gray-600"}`}>{item.desc}</p>
+                <div>
+                  <h4 className={`font-semibold text-lg mb-2 ${isDark ? "text-white" : "text-gray-900"}`}>{item.title}</h4>
+                  <p className={`text-sm leading-relaxed ${isDark ? "text-gray-400" : "text-gray-600"}`}>{item.desc}</p>
+                </div>
               </div>
             ))}
           </div>
@@ -206,7 +209,7 @@ const LandingPage = () => {
       {/* Footer */}
       <footer className={`py-8 mt-16 border-t ${isDark ? "border-gray-800" : "border-gray-200"}`}>
         <p className={`text-center text-sm ${isDark ? "text-gray-500" : "text-gray-500"}`}>
-          Infographic MVP v2.0 — Gemini Blueprint → Prompt Compiler → Nano Banana Pro Pipeline
+          Visual Intelligence for Modern Reports
         </p>
       </footer>
     </div>
