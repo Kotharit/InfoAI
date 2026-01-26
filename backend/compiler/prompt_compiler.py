@@ -208,10 +208,20 @@ def compile_prompt(blueprint: Dict[str, Any]) -> str:
     # Assemble the full prompt
     prompt = f"""Create a professional, executive-grade infographic image.
 
+=== CRITICAL TEXT RENDERING RULES ===
+⚠️ MINIMIZE ALL TEXT IN THE IMAGE - This is the most important rule!
+- Use ICONS, SYMBOLS, and ILLUSTRATIONS instead of text wherever possible
+- Maximum 3-5 words per label or heading
+- NO paragraphs or sentences in the image
+- NO bullet point text lists - use visual icons with single-word labels
+- Title and subtitle should be the ONLY full text elements
+- Replace text descriptions with visual metaphors and illustrations
+- If you must include text, keep it to SHORT labels only (1-3 words max)
+
 === HEADER ===
 Title: "{title}"
 Subtitle: "{subtitle}"
-One-line Summary: "{summary}"
+(These are the ONLY longer text elements allowed)
 
 === STYLE & TONE ===
 - Tone: {tone.capitalize()} consulting/business infographic
@@ -228,38 +238,44 @@ One-line Summary: "{summary}"
 - Dark/Text Color: {palette_info['dark']}
 
 === TYPOGRAPHY ===
-- Font Style: Clean, modern sans-serif (like Inter, Helvetica, or similar)
+- Font Style: Clean, modern sans-serif
 - Title: Bold, large, prominent at top
-- Headings: Semi-bold, clear hierarchy
-- Body text: Regular weight, highly legible
+- ALL OTHER TEXT: Keep extremely minimal - use icons instead
+- NO body text paragraphs
 - NO decorative or script fonts
 
 === LAYOUT ===
 {layout_inst}
 
-=== SECTIONS CONTENT ===
+=== VISUAL CONTENT APPROACH ===
+For each section below, create VISUAL REPRESENTATIONS not text:
+- Use illustrations, icons, and symbols to convey meaning
+- Show concepts through imagery (e.g., tangled wires vs organized rack)
+- Use color coding and visual hierarchy
+- Add simple 1-2 word labels ONLY where absolutely necessary
+
 {sections_text}
 
 === TECHNICAL REQUIREMENTS ===
 - Output: Single high-resolution PNG image
-- Dimensions: 3000x2000 pixels (landscape) or 2000x3000 (portrait based on content)
-- Background: Clean, subtle gradient or solid from palette
-- Margins: Adequate whitespace for executive presentation
+- Dimensions: 3000x2000 pixels (landscape)
+- Background: Clean, solid from palette
+- Margins: Adequate whitespace
 
 === DO's ===
-- Use clear visual hierarchy
-- Include icons and illustrations that support the content
-- Ensure all text is readable and well-spaced
-- Create visual flow that guides the eye through the narrative
-- Use the specified color palette consistently
+- Use ICONS and ILLUSTRATIONS as primary communication
+- Use visual metaphors (before/after imagery)
+- Use color to differentiate sections
+- Keep any text to 1-3 word labels maximum
+- Create clear visual flow without relying on text
 
-=== DON'Ts ===
-- NO raw text dumps or walls of text
-- NO decorative flourishes that reduce clarity (unless creativity is 'high')
-- NO gradients that make text hard to read
-- NO clip-art or low-quality graphics
-- NO overlapping elements that obscure information
-- DO NOT include any watermarks or signatures
+=== DON'Ts - CRITICAL ===
+- ❌ NO paragraphs or sentences
+- ❌ NO bullet point lists with text
+- ❌ NO text longer than 3 words (except title/subtitle)
+- ❌ NO raw text dumps or walls of text
+- ❌ NO spelling out full descriptions - use visuals instead
+- ❌ DO NOT include any watermarks or signatures
 """
     
     return prompt.strip()
