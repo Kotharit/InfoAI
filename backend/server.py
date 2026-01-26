@@ -18,9 +18,12 @@ import base64
 # Import our prompt compiler
 from compiler.prompt_compiler import compile_prompt, validate_blueprint
 
-# Import Google GenAI SDK
+# Import Google GenAI SDK for text generation (using user's key)
 from google import genai
 from google.genai import types
+
+# Import emergentintegrations for image generation (using Emergent key)
+from emergentintegrations.llm.chat import LlmChat, UserMessage
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -30,7 +33,7 @@ mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
-# Initialize Google GenAI client
+# Initialize Google GenAI client with USER's API key (for text/blueprint)
 genai_client = genai.Client(api_key=os.environ.get('GEMINI_API_KEY', ''))
 
 # Create the main app without a prefix
@@ -133,7 +136,10 @@ IMPORTANT: Return EXACTLY the JSON object and NOTHING ELSE. No markdown, no code
 
 
 async def call_gemini_for_blueprint(input_text: str) -> Dict[str, Any]:
-    """Call Gemini API to generate Visual Blueprint JSON."""
+    """
+    Call Gemini API to generate Visual Blueprint JSON.
+    Uses USER's GEMINI_API_KEY for text generation.
+    """
     api_key = os.environ.get('GEMINI_API_KEY', '')
     if not api_key:
         raise HTTPException(status_code=500, detail="GEMINI_API_KEY not configured")
@@ -164,54 +170,33 @@ async def call_gemini_for_blueprint(input_text: str) -> Dict[str, Any]:
 
 
 async def call_nano_banana_for_image(compiled_prompt: str) -> Dict[str, Any]:
-    """Call Nano Banana (Gemini Image) API to generate infographic image."""
-    api_key = os.environ.get('GEMINI_API_KEY', '')
+    """
+    Call Nano Banana Pro API to generate infographic image.
+    Uses EMERGENT_LLM_KEY for image generation (paid access).
+    """
+    api_key = os.environ.get('EMERGENT_LLM_KEY', '')
     if not api_key:
-        raise HTTPException(status_code=500, detail="GEMINI_API_KEY not configured")
+        raise HTTPException(status_code=500, detail="EMERGENT_LLM_KEY not configured for image generation")
     
     try:
-        # Use Nano Banana (gemini-2.5-flash-image) for image generation
-        response = genai_client.models.generate_content(
-            model="gemini-2.5-flash-image",
-            contents=[compiled_prompt],
-            config=types.GenerateContentConfig(
-                response_modalities=['IMAGE'],
-                image_config=types.ImageConfig(
-                    aspect_ratio="3:2",  # Landscape for infographics
-                )
-            )
+        chat = LlmChat(
+            api_key=api_key,
+            session_id=str(uuid.uuid4()),
+            system_message="You are an AI image generation assistant."
         )
+        chat.with_model("gemini", "gemini-3-pro-image-preview").with_params(modalities=["image", "text"])
         
-        images = []
-        text_response = ""
-        
-        for part in response.candidates[0].content.parts:
-            if hasattr(part, 'text') and part.text:
-                text_response += part.text
-            elif hasattr(part, 'inline_data') and part.inline_data:
-                # Get base64 image data
-                image_data = part.inline_data.data
-                mime_type = part.inline_data.mime_type or "image/png"
-                
-                # Convert to base64 string if it's bytes
-                if isinstance(image_data, bytes):
-                    image_base64 = base64.b64encode(image_data).decode('utf-8')
-                else:
-                    image_base64 = image_data
-                
-                images.append({
-                    "data": image_base64,
-                    "mime_type": mime_type
-                })
+        user_message = UserMessage(text=compiled_prompt)
+        text_response, images = await chat.send_message_multimodal_response(user_message)
         
         logger.info(f"Nano Banana response - text: {text_response[:100] if text_response else 'None'}...")
-        logger.info(f"Nano Banana generated {len(images)} image(s)")
+        logger.info(f"Nano Banana generated {len(images) if images else 0} image(s)")
         
         # Save response metadata for debugging
         debug_info = {
             "text_response": text_response[:500] if text_response else None,
-            "num_images": len(images),
-            "image_types": [img.get('mime_type') for img in images]
+            "num_images": len(images) if images else 0,
+            "image_types": [img.get('mime_type') for img in images] if images else []
         }
         save_debug_file("nanobanana_response.json", json.dumps(debug_info, indent=2))
         
@@ -262,12 +247,18 @@ def parse_json_response(text: str) -> Dict[str, Any]:
 # Routes
 @api_router.get("/")
 async def root():
-    return {"message": "Infographic MVP API v2.0 - Gemini Blueprint → Nano Banana Pipeline (Your API Key)"}
+    return {"message": "Infographic MVP API v2.0 - Hybrid: Your Gemini Key (text) + Emergent Key (images)"}
 
 
 @api_router.get("/health")
 async def health_check():
-    return {"status": "healthy", "version": "2.0.0", "api_key_configured": bool(os.environ.get('GEMINI_API_KEY'))}
+    return {
+        "status": "healthy", 
+        "version": "2.0.0", 
+        "gemini_key_configured": bool(os.environ.get('GEMINI_API_KEY')),
+        "emergent_key_configured": bool(os.environ.get('EMERGENT_LLM_KEY')),
+        "mode": "hybrid"
+    }
 
 
 @api_router.post("/generate")
@@ -278,12 +269,12 @@ async def generate_infographic(
     """
     Generate an infographic from PDF file or text prompt.
     
-    Pipeline:
+    Hybrid Pipeline:
     1. Extract text from PDF/prompt
-    2. Call Gemini to generate Visual Blueprint JSON
+    2. Call Gemini (YOUR KEY) to generate Visual Blueprint JSON
     3. Validate blueprint against schema
     4. Compile blueprint into Nano Banana prompt
-    5. Call Nano Banana to generate image
+    5. Call Nano Banana Pro (EMERGENT KEY) to generate image
     6. Return image as base64
     """
     user_text = (prompt or "").strip()
@@ -311,8 +302,8 @@ async def generate_infographic(
         input_text = prepare_payload_text(user_text)
         logger.info(f"Processing input text of length: {len(input_text)}")
         
-        # Step 2: Call Gemini for Visual Blueprint
-        logger.info("Calling Gemini for Visual Blueprint...")
+        # Step 2: Call Gemini for Visual Blueprint (YOUR KEY)
+        logger.info("Calling Gemini (your key) for Visual Blueprint...")
         gemini_response = await call_gemini_for_blueprint(input_text)
         raw_text = gemini_response.get("text", "")
         
@@ -343,15 +334,15 @@ async def generate_infographic(
         save_debug_file("compiled_prompt.txt", compiled_prompt)
         logger.info(f"Compiled prompt length: {len(compiled_prompt)} chars")
         
-        # Step 5: Call Nano Banana for image generation
-        logger.info("Calling Nano Banana for image generation...")
+        # Step 5: Call Nano Banana Pro for image generation (EMERGENT KEY)
+        logger.info("Calling Nano Banana Pro (Emergent key) for image generation...")
         image_response = await call_nano_banana_for_image(compiled_prompt)
         
         images = image_response.get("images", [])
         if not images:
             return JSONResponse(
                 status_code=502,
-                content={"ok": False, "error": "No image generated by Nano Banana"}
+                content={"ok": False, "error": "No image generated by Nano Banana Pro"}
             )
         
         # Get the first image
