@@ -430,7 +430,7 @@ async def generate_infographic(
     if username:
         user = USERS.get(username)
         if user and user["role"] == "contributor":
-            if db:
+            if db is not None:
                 usage_doc = await db.usage.find_one({"username": username})
                 usage_count = usage_doc.get("count", 0) if usage_doc else 0
             else:
