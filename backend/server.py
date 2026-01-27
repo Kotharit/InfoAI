@@ -373,7 +373,7 @@ async def login(request: LoginRequest):
 async def get_usage(username: str):
     """Get usage count for a user."""
     # Try MongoDB first, fallback to in-memory cache
-    if db:
+    if db is not None:
         usage_doc = await db.usage.find_one({"username": username})
         usage_count = usage_doc.get("count", 0) if usage_doc else 0
     else:
