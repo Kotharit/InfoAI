@@ -383,7 +383,7 @@ async def get_usage(username: str):
 
 async def increment_usage(username: str):
     """Increment usage count for a user."""
-    if db:
+    if db is not None:
         await db.usage.update_one(
             {"username": username},
             {"$inc": {"count": 1}},
