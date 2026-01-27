@@ -266,7 +266,7 @@ Keep text to an absolute minimum and let visuals tell the story.
     try:
         # Use Nano Banana Pro model
         response = genai_client.models.generate_content(
-            model="gemini-2.0-flash-preview-image-generation",
+            model="nano-banana-pro-preview",
             contents=[final_prompt],
             config=types.GenerateContentConfig(
                 response_modalities=['IMAGE', 'TEXT'],
