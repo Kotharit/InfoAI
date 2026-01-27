@@ -18,25 +18,26 @@ import base64
 # Import our prompt compiler
 from compiler.prompt_compiler import compile_prompt, validate_blueprint
 
-# Import Google GenAI SDK for text generation (using user's key)
+# Import Google GenAI SDK for both text and image generation
 from google import genai
-
-# Import emergentintegrations for image generation (using Emergent key)
-from emergentintegrations.llm.chat import LlmChat, UserMessage
+from google.genai import types
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-# MongoDB connection
-mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
+# MongoDB connection - handle missing MONGO_URL for Vercel
+mongo_url = os.environ.get('MONGO_URL', '')
+db = None
+if mongo_url:
+    client = AsyncIOMotorClient(mongo_url)
+    db = client[os.environ.get('DB_NAME', 'infographic_db')]
 
-# Initialize Google GenAI client with USER's API key (for text/blueprint)
-genai_client = genai.Client(api_key=os.environ.get('GEMINI_API_KEY', ''))
+# Initialize Google GenAI client with user's API key
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
+genai_client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 
-# Create the main app without a prefix
-app = FastAPI(title="Infographic MVP API", version="2.0.0")
+# Create the main app
+app = FastAPI(title="Infographic Studio API", version="2.1.0")
 
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
@@ -50,13 +51,19 @@ logger = logging.getLogger(__name__)
 
 # Ensure debug directory exists
 DEBUG_DIR = Path("/tmp/debug")
-DEBUG_DIR.mkdir(exist_ok=True)
+try:
+    DEBUG_DIR.mkdir(exist_ok=True)
+except:
+    DEBUG_DIR = Path("/tmp")
 
 # Simple user database (in production, use proper hashing)
 USERS = {
     "admin": {"password": "admin123", "role": "admin"},
     "contributor": {"password": "contrib123", "role": "contributor"}
 }
+
+# In-memory usage tracking for serverless (fallback when no DB)
+usage_cache = {}
 
 
 def save_debug_file(filename: str, content: str):
@@ -101,14 +108,12 @@ def build_gemini_prompt(document_text: str, settings: Dict[str, Any]) -> str:
     text_density = settings.get("textDensity", "balanced")
     tone = settings.get("tone", "professional")
     
-    # Map tone to JSON tone value
     tone_mapping = {
         "professional": "professional",
-        "creative": "executive"  # creative maps to more expressive executive style
+        "creative": "executive"
     }
     json_tone = tone_mapping.get(tone, "professional")
     
-    # Text density instructions
     text_instructions = {
         "low": "Use minimal text. Focus on visual elements and icons. Each bullet point should be 3-5 words max.",
         "balanced": "Balance text and visuals. Each bullet point should be 6-10 words.",
@@ -116,7 +121,6 @@ def build_gemini_prompt(document_text: str, settings: Dict[str, Any]) -> str:
     }
     text_instruction = text_instructions.get(text_density, text_instructions["balanced"])
     
-    # Tone instructions
     tone_instructions = {
         "professional": "Maintain a formal, business-appropriate tone. Focus on clarity and precision.",
         "creative": "Use engaging, storytelling language. Be more expressive and use vivid metaphors."
@@ -182,8 +186,7 @@ IMPORTANT: Return EXACTLY the JSON object and NOTHING ELSE. No markdown, no code
 
 async def call_gemini_for_blueprint(input_text: str, settings: Dict[str, Any]) -> Dict[str, Any]:
     """Call Gemini API to generate Visual Blueprint JSON with user settings."""
-    api_key = os.environ.get('GEMINI_API_KEY', '')
-    if not api_key:
+    if not genai_client:
         raise HTTPException(status_code=500, detail="GEMINI_API_KEY not configured")
     
     prompt = build_gemini_prompt(input_text, settings)
@@ -209,12 +212,11 @@ async def call_gemini_for_blueprint(input_text: str, settings: Dict[str, Any]) -
 
 
 async def call_nano_banana_for_image(compiled_prompt: str, settings: Dict[str, Any]) -> Dict[str, Any]:
-    """Call Nano Banana Pro API to generate infographic image."""
-    api_key = os.environ.get('EMERGENT_LLM_KEY', '')
-    if not api_key:
-        raise HTTPException(status_code=500, detail="EMERGENT_LLM_KEY not configured for image generation")
+    """Call Nano Banana (Gemini Image) API to generate infographic image using user's Gemini API key."""
+    if not genai_client:
+        raise HTTPException(status_code=500, detail="GEMINI_API_KEY not configured")
     
-    # Critical text-minimization instructions to prevent spelling errors
+    # Critical text-minimization instructions
     text_rules = """
 
 === CRITICAL INSTRUCTIONS FOR ERROR-FREE OUTPUT ===
@@ -250,7 +252,6 @@ THIS IS CRITICAL: Spelling errors occur when too much text is rendered.
 Keep text to an absolute minimum and let visuals tell the story.
 """
     
-    # Add text density specific modifier
     text_density = settings.get("textDensity", "balanced")
     density_modifier = ""
     if text_density == "low":
@@ -263,24 +264,42 @@ Keep text to an absolute minimum and let visuals tell the story.
     final_prompt = compiled_prompt + text_rules + density_modifier
     
     try:
-        chat = LlmChat(
-            api_key=api_key,
-            session_id=str(uuid.uuid4()),
-            system_message="You are an AI image generation assistant that creates visual-first infographics with minimal text to avoid spelling errors."
+        # Use Nano Banana Pro (gemini-2.0-flash-exp-image-generation) via official SDK
+        response = genai_client.models.generate_content(
+            model="gemini-2.0-flash-exp-image-generation",
+            contents=[final_prompt],
+            config=types.GenerateContentConfig(
+                response_modalities=['IMAGE', 'TEXT'],
+            )
         )
-        # Using Nano Banana Pro model
-        chat.with_model("gemini", "gemini-3-pro-image-preview").with_params(modalities=["image", "text"])
         
-        user_message = UserMessage(text=final_prompt)
-        text_response, images = await chat.send_message_multimodal_response(user_message)
+        images = []
+        text_response = ""
+        
+        for part in response.candidates[0].content.parts:
+            if hasattr(part, 'text') and part.text:
+                text_response += part.text
+            elif hasattr(part, 'inline_data') and part.inline_data:
+                image_data = part.inline_data.data
+                mime_type = part.inline_data.mime_type or "image/png"
+                
+                if isinstance(image_data, bytes):
+                    image_base64 = base64.b64encode(image_data).decode('utf-8')
+                else:
+                    image_base64 = image_data
+                
+                images.append({
+                    "data": image_base64,
+                    "mime_type": mime_type
+                })
         
         logger.info(f"Nano Banana Pro response - text: {text_response[:100] if text_response else 'None'}...")
-        logger.info(f"Nano Banana Pro generated {len(images) if images else 0} image(s)")
+        logger.info(f"Nano Banana Pro generated {len(images)} image(s)")
         
         debug_info = {
             "text_response": text_response[:500] if text_response else None,
-            "num_images": len(images) if images else 0,
-            "image_types": [img.get('mime_type') for img in images] if images else []
+            "num_images": len(images),
+            "image_types": [img.get('mime_type') for img in images]
         }
         save_debug_file("nanobanana_response.json", json.dumps(debug_info, indent=2))
         
@@ -353,33 +372,40 @@ async def login(request: LoginRequest):
 @api_router.get("/auth/usage/{username}")
 async def get_usage(username: str):
     """Get usage count for a user."""
-    usage_doc = await db.usage.find_one({"username": username})
-    usage_count = usage_doc.get("count", 0) if usage_doc else 0
+    # Try MongoDB first, fallback to in-memory cache
+    if db:
+        usage_doc = await db.usage.find_one({"username": username})
+        usage_count = usage_doc.get("count", 0) if usage_doc else 0
+    else:
+        usage_count = usage_cache.get(username, 0)
     return {"ok": True, "usage_count": usage_count}
 
 
 async def increment_usage(username: str):
     """Increment usage count for a user."""
-    await db.usage.update_one(
-        {"username": username},
-        {"$inc": {"count": 1}},
-        upsert=True
-    )
+    if db:
+        await db.usage.update_one(
+            {"username": username},
+            {"$inc": {"count": 1}},
+            upsert=True
+        )
+    else:
+        usage_cache[username] = usage_cache.get(username, 0) + 1
 
 
 # Main Routes
 @api_router.get("/")
 async def root():
-    return {"message": "Infographic Studio API"}
+    return {"message": "Infographic Studio API", "version": "2.1.0"}
 
 
 @api_router.get("/health")
 async def health_check():
     return {
         "status": "healthy", 
-        "version": "2.0.0", 
-        "gemini_key_configured": bool(os.environ.get('GEMINI_API_KEY')),
-        "emergent_key_configured": bool(os.environ.get('EMERGENT_LLM_KEY'))
+        "version": "2.1.0", 
+        "gemini_key_configured": bool(GEMINI_API_KEY),
+        "database_connected": db is not None
     }
 
 
@@ -404,8 +430,11 @@ async def generate_infographic(
     if username:
         user = USERS.get(username)
         if user and user["role"] == "contributor":
-            usage_doc = await db.usage.find_one({"username": username})
-            usage_count = usage_doc.get("count", 0) if usage_doc else 0
+            if db:
+                usage_doc = await db.usage.find_one({"username": username})
+                usage_count = usage_doc.get("count", 0) if usage_doc else 0
+            else:
+                usage_count = usage_cache.get(username, 0)
             if usage_count >= 2:
                 return JSONResponse(
                     status_code=403,
@@ -543,11 +572,10 @@ app.include_router(api_router)
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-@app.on_event("shutdown")
-async def shutdown_db_client():
-    client.close()
+# For Vercel serverless
+handler = app
