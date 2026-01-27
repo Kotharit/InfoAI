@@ -3,8 +3,9 @@ import "@/App.css";
 import { BrowserRouter, Routes, Route, useNavigate, Navigate } from "react-router-dom";
 import axios from "axios";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
+// API URL - works for both local development and Vercel deployment
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || '';
+const API = BACKEND_URL ? `${BACKEND_URL}/api` : '/api';
 
 // Auth Context
 const AuthContext = createContext();
