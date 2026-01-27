@@ -264,9 +264,9 @@ Keep text to an absolute minimum and let visuals tell the story.
     final_prompt = compiled_prompt + text_rules + density_modifier
     
     try:
-        # Use Nano Banana Pro (gemini-2.0-flash-exp-image-generation) via official SDK
+        # Use Nano Banana Pro model
         response = genai_client.models.generate_content(
-            model="gemini-2.0-flash-exp-image-generation",
+            model="gemini-2.0-flash-preview-image-generation",
             contents=[final_prompt],
             config=types.GenerateContentConfig(
                 response_modalities=['IMAGE', 'TEXT'],
