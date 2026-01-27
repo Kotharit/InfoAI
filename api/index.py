@@ -267,7 +267,7 @@ async def generate(
             text_rule = "\n\nCRITICAL: NO TEXT except title. Pure visual icons and illustrations only!"
         
         image_response = genai_client.models.generate_content(
-            model="gemini-2.0-flash-exp-image-generation",
+            model="gemini-2.0-flash-preview-image-generation",
             contents=[compiled_prompt + text_rule],
             config=types.GenerateContentConfig(response_modalities=['IMAGE', 'TEXT'])
         )
